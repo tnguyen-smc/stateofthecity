@@ -389,8 +389,7 @@ function showHostLanding(notice) {
         ${notice ? `<div class="mt-6 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-sm px-4 py-3 pop">${esc(notice)}</div>` : ''}
         <h1 class="wordmark text-3xl md:text-5xl text-slate-600 text-center mt-8 mb-5">Build a New City</h1>
         <section class="panel p-7 md:p-9 flex flex-col">
-          <div class="text-4xl mb-4">📽️</div>
-          <h2 class="font-display text-2xl md:text-3xl font-semibold text-white leading-tight">Run the presentation</h2>
+          <h2 class="font-display text-2xl md:text-3xl font-semibold text-white leading-tight">Host Presentation</h2>
           <p class="text-slate-300 mt-3 leading-relaxed">Project this screen. Set the budget and the project queue, then put each item to a live vote and place what passes onto the city grid.</p>
           <div class="pt-7 space-y-3">
             <button data-act="host" class="btn btn-green w-full !text-lg !py-4">Launch host screen</button>
@@ -430,8 +429,8 @@ function showJoinPage(notice) {
         <div class="flex justify-center">${logoImg(110)}</div>
         ${notice ? `<div class="mt-6 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-sm px-4 py-3 pop">${esc(notice)}</div>` : ''}
         <section class="card p-7 mt-7">
-          <h1 class="font-display text-2xl md:text-3xl font-semibold leading-tight">Join your table</h1>
-          <p class="text-slate-500 mt-2 leading-relaxed">Enter the room code from the main screen and name your table. Each table gets one vote per item.</p>
+          <h1 class="font-display text-2xl md:text-3xl font-semibold leading-tight">Join the Room</h1>
+          <p class="text-slate-500 mt-2 leading-relaxed">Enter the room code from the main screen and name your table. Each table gets only one vote per item.</p>
           <div class="mt-6 space-y-4">
             <div><label class="lbl" for="jCode">Room code</label>
               <input id="jCode" class="field num !text-3xl !font-bold tracking-[.35em] uppercase text-center" maxlength="6" autocomplete="off" autocapitalize="characters" placeholder="ABCD" value="${esc(URL_CODE)}"></div>
