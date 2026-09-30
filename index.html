@@ -3,12 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0b1120">
-<title>CityBudget Live – Municipal Budgeting Simulation</title>
+<meta name="theme-color" content="#f6f7f4">
+<title>Our City – Live Budgeting Simulation</title>
 
 <!--
   ┌──────────────────────────────────────────────────────────────────────────┐
-  │ CityBudget Live — single-file app (no build step)                         │
+  │ Our City — single-file app (no build step)                                │
   │                                                                          │
   │ DEPLOY:  save as index.html → push to GitHub → GitHub Pages / Cloudflare │
   │          Pages (build command: none, output dir: /).                     │
@@ -23,67 +23,77 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <script>
   tailwind.config = {
-    theme: { extend: { fontFamily: {
-      display: ['"Space Grotesk"', 'Inter', 'system-ui', 'sans-serif'],
-      sans: ['Inter', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif']
-    } } }
+    theme: { extend: {
+      fontFamily: {
+        display: ['Montserrat', 'system-ui', 'sans-serif'],
+        sans: ['Montserrat', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif']
+      },
+      colors: {
+        /* warm charcoal greys, like the logo lettering */
+        slate: { 50:'#f7f7f5',100:'#eeefeb',200:'#e0e1dc',300:'#c9cac5',400:'#9d9e9a',500:'#77787a',600:'#58595b',700:'#4a4b4d',800:'#38393b',900:'#2a2b2c',950:'#1a1a1b' },
+        /* leaf green = YES / money left */
+        emerald: { 50:'#f4f9e8',100:'#e5f2c6',200:'#cfe69b',300:'#b4d86a',400:'#9bcb45',500:'#6fa821',600:'#5a8f17',700:'#4a7a12',800:'#3b5f12',900:'#2f4c12',950:'#1c2f08' },
+        /* crimson = NO / money spent */
+        rose: { 50:'#fdf0f0',100:'#fadcdc',200:'#f4b8b9',300:'#ea8b8d',400:'#dc5a5e',500:'#c8323a',600:'#b02229',700:'#8f1a20',800:'#721519',900:'#5a1215',950:'#330a0c' }
+      }
+    } }
   };
 </script>
 
 <style>
   html, body { height: 100%; }
   body {
-    font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
-    background: #0b1120; color: #e2e8f0;
-    -webkit-tap-highlight-color: transparent;
-    overscroll-behavior-y: none;
+    font-family: Montserrat, system-ui, -apple-system, 'Segoe UI', sans-serif;
+    background: #f6f7f4; color: #4a4b4d;
+    -webkit-tap-highlight-color: transparent; overscroll-behavior-y: none;
   }
   .bg-grid {
-    background-color: #0b1120;
+    background-color: #f6f7f4;
     background-image:
-      radial-gradient(circle at 12% -10%, rgba(16,185,129,.16), transparent 42%),
-      radial-gradient(circle at 100% 110%, rgba(56,189,248,.12), transparent 40%);
+      radial-gradient(circle at 6% -8%, rgba(141,198,63,.18), transparent 40%),
+      radial-gradient(circle at 100% 0%, rgba(41,171,226,.10), transparent 38%),
+      radial-gradient(circle at 94% 108%, rgba(123,63,152,.09), transparent 40%);
   }
-  .num { font-family: 'Space Grotesk', Inter, system-ui, sans-serif; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
-  .card { background: #fff; color: #0f172a; border-radius: 1.5rem; box-shadow: 0 18px 40px -18px rgba(0,0,0,.55); }
-  .panel { background: rgba(15,23,42,.72); border: 1px solid rgba(148,163,184,.14); border-radius: 1.5rem; backdrop-filter: blur(6px); }
+  .num { font-family: Montserrat, system-ui, sans-serif; font-variant-numeric: tabular-nums; letter-spacing: -.03em; }
+  .wordmark { font-weight: 300; letter-spacing: .16em; text-transform: uppercase; line-height: 1.1; }
+  .card { background: #fff; color: #38393b; border-radius: 1.25rem; border: 1px solid #e6e7e2; box-shadow: 0 14px 34px -22px rgba(56,57,59,.45); }
+  .panel { background: #4a4b4d; color: #fff; border-radius: 1.25rem; box-shadow: 0 14px 34px -18px rgba(56,57,59,.65); }
   .chip { display:inline-flex; align-items:center; gap:.35rem; padding:.15rem .6rem; border-radius:999px; font-size:.72rem; font-weight:700; border:1px solid transparent; }
-  .field { width:100%; border:1.5px solid #cbd5e1; border-radius:.75rem; padding:.6rem .8rem; font-size:.95rem; background:#fff; color:#0f172a; outline:none; }
-  .field:focus { border-color:#10b981; box-shadow:0 0 0 3px rgba(16,185,129,.2); }
-  .lbl { display:block; font-size:.78rem; font-weight:700; color:#475569; margin-bottom:.3rem; }
+  .field { width:100%; border:1.5px solid #d4d5d0; border-radius:.75rem; padding:.6rem .8rem; font-size:.95rem; background:#fff; color:#2a2b2c; outline:none; }
+  .field:focus { border-color:#8dc63f; box-shadow:0 0 0 3px rgba(141,198,63,.28); }
+  .lbl { display:block; font-size:.78rem; font-weight:600; color:#58595b; margin-bottom:.3rem; }
   .btn { display:inline-flex; align-items:center; justify-content:center; gap:.5rem; font-weight:700; border-radius:.85rem; padding:.65rem 1.1rem; transition: transform .08s, filter .15s, background .15s; cursor:pointer; }
   .btn:active { transform: scale(.97); }
   .btn:disabled { opacity:.45; cursor:not-allowed; }
-  .btn-green { background:#10b981; color:#04261b; } .btn-green:hover:not(:disabled){ filter:brightness(1.08); }
-  .btn-dark { background:#0f172a; color:#fff; } .btn-dark:hover:not(:disabled){ background:#1e293b; }
-  .btn-ghost { background:rgba(148,163,184,.14); color:#e2e8f0; } .btn-ghost:hover:not(:disabled){ background:rgba(148,163,184,.26); }
-  .btn-light { background:#f1f5f9; color:#0f172a; } .btn-light:hover:not(:disabled){ background:#e2e8f0; }
-  .btn-red { background:#f43f5e; color:#fff; }
-  :focus-visible { outline: 3px solid #34d399; outline-offset: 2px; }
+  .btn-green { background:#8dc63f; color:#1f330a; } .btn-green:hover:not(:disabled){ filter:brightness(1.07); }
+  .btn-dark { background:#4a4b4d; color:#fff; } .btn-dark:hover:not(:disabled){ background:#38393b; }
+  .btn-ghost { background:rgba(74,75,77,.08); color:#4a4b4d; } .btn-ghost:hover:not(:disabled){ background:rgba(74,75,77,.15); }
+  .panel .btn-ghost { background:rgba(255,255,255,.14); color:#fff; } .panel .btn-ghost:hover:not(:disabled){ background:rgba(255,255,255,.25); }
+  .btn-light { background:#eeefeb; color:#38393b; } .btn-light:hover:not(:disabled){ background:#e0e1dc; }
+  .btn-red { background:#c8323a; color:#fff; }
+  :focus-visible { outline: 3px solid #29abe2; outline-offset: 2px; }
 
-  /* ---- Imaginary city ---- */
-  .city-grid { display:grid; gap:10px; padding:14px; height:100%; min-height:340px; border-radius:1.25rem;
-    background-color:#0a1020;
-    background-image: radial-gradient(rgba(148,163,184,.10) 1px, transparent 1px);
-    background-size: 18px 18px;
-    border:1px solid rgba(148,163,184,.12); }
-  .lot { border-radius:14px; border:1.5px dashed rgba(148,163,184,.16); background: rgba(148,163,184,.03); }
+  /* ---- The city ---- */
+  .city-grid { display:grid; gap:10px; padding:14px; height:100%; min-height:340px; border-radius:1rem;
+    background-color:#f3f4f0; background-image: radial-gradient(rgba(74,75,77,.13) 1px, transparent 1px); background-size: 18px 18px;
+    border:1px solid #e6e7e2; }
+  .lot { border-radius:14px; border:1.5px dashed rgba(74,75,77,.2); background: rgba(74,75,77,.025); }
   .tile { position:relative; min-width:0; min-height:0; border-radius:14px; border:1.5px solid var(--cb);
-    background: linear-gradient(160deg, var(--c1), var(--c2)); display:flex; flex-direction:column; align-items:center; justify-content:center;
-    gap:.25rem; padding:.35rem; text-align:center; overflow:hidden; box-shadow: 0 10px 22px -12px var(--cb); }
+    background: linear-gradient(160deg, var(--c1), var(--c2)), #fff; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:.25rem; padding:.35rem; text-align:center; overflow:hidden; box-shadow: 0 10px 20px -14px var(--cb); }
   .tile-icon { font-size: clamp(1.5rem, 3.3vw, 3.8rem); line-height:1; }
-  .tile-name { font-size: clamp(.6rem, .85vw, .95rem); font-weight:700; color:#f1f5f9; line-height:1.15; max-width:100%; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
-  .tile-cost { font-size: clamp(.55rem,.75vw,.85rem); font-weight:700; color:#6ee7b7; }
-  .tile-tag { font-size:.6rem; font-weight:700; color:#94a3b8; }
-  .tile-base { filter: saturate(.35) brightness(.85); }
+  .tile-name { font-size: clamp(.6rem, .85vw, .95rem); font-weight:700; color:#38393b; line-height:1.15; max-width:100%; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
+  .tile-cost { font-size: clamp(.55rem,.75vw,.85rem); font-weight:700; color:#5a8f17; }
+  .tile-tag { font-size:.6rem; font-weight:600; color:#8b8c8e; }
+  .tile-base { filter: saturate(.3); opacity:.85; }
   .ico-img { width:1em; height:1em; object-fit:contain; border-radius:.2em; display:block; }
 
   /* ---- Motion ---- */
   @keyframes drop { 0%{transform:translateY(-140px) scale(1.3);opacity:0} 55%{transform:translateY(8px) scale(.97);opacity:1} 75%{transform:translateY(-7px) scale(1.02)} 100%{transform:none;opacity:1} }
-  @keyframes ring { 0%{box-shadow:0 0 0 0 rgba(52,211,153,.85)} 100%{box-shadow:0 0 0 34px rgba(52,211,153,0)} }
+  @keyframes ring { 0%{box-shadow:0 0 0 0 rgba(141,198,63,.9)} 100%{box-shadow:0 0 0 34px rgba(141,198,63,0)} }
   .tile-new { animation: drop .95s cubic-bezier(.2,.8,.2,1) both, ring 1.5s .55s ease-out; z-index:2; }
   @keyframes pop { 0%{transform:scale(.88);opacity:0} 100%{transform:scale(1);opacity:1} }
   .pop { animation: pop .35s cubic-bezier(.2,1.2,.3,1) both; }
@@ -94,12 +104,13 @@
   @keyframes drain { from{width:100%} to{width:0} }
   .drain { animation: drain linear forwards; }
   @keyframes confetti { to { transform: translate(var(--dx), 110vh) rotate(var(--rot)); opacity:1 } }
-  @keyframes glow { 0%,100%{box-shadow:0 0 0 0 rgba(52,211,153,.0)} 50%{box-shadow:0 0 0 8px rgba(52,211,153,.25)} }
+  @keyframes glow { 0%,100%{box-shadow:0 0 0 0 rgba(141,198,63,0)} 50%{box-shadow:0 0 0 9px rgba(141,198,63,.3)} }
   .glow { animation: glow 1.6s ease-in-out infinite; }
   @keyframes dots { 0%,20%{opacity:.2} 50%{opacity:1} 100%{opacity:.2} }
   .dot-a { animation: dots 1.4s infinite; } .dot-b { animation: dots 1.4s .2s infinite; } .dot-c { animation: dots 1.4s .4s infinite; }
   @keyframes checkPop { 0%{transform:scale(0) rotate(-30deg)} 70%{transform:scale(1.15) rotate(6deg)} 100%{transform:scale(1) rotate(0)} }
   .check-pop { animation: checkPop .5s cubic-bezier(.2,1.3,.3,1) both; }
+  @keyframes fan { from{transform:translate(60px,60px) rotate(0) scale(.2);opacity:0} }
   .vote-btn { border-radius: 1.75rem; font-weight: 800; color:#fff; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:.25rem;
     border-bottom: 10px solid rgba(0,0,0,.25); transition: transform .08s, border-width .08s, filter .15s; touch-action: manipulation; user-select:none; }
   .vote-btn:active:not(:disabled) { transform: translateY(6px); border-bottom-width: 4px; }
@@ -128,16 +139,16 @@ const HEARTBEAT_MS = 5000;
 const STALE_MS = 16000;
 
 const CATS = {
-  'Transportation':     { color: '#38bdf8', icon: '🚌' },
-  'Public Safety':      { color: '#f87171', icon: '🚒' },
-  'Parks & Recreation': { color: '#4ade80', icon: '🌳' },
-  'Education':          { color: '#fbbf24', icon: '📚' },
-  'Health':             { color: '#f472b6', icon: '🏥' },
-  'Utilities':          { color: '#22d3ee', icon: '🚰' },
-  'Housing':            { color: '#a78bfa', icon: '🏢' },
-  'Culture':            { color: '#fb923c', icon: '🎭' },
-  'Economy':            { color: '#2dd4bf', icon: '💼' },
-  'Other':              { color: '#94a3b8', icon: '📦' }
+  'Transportation':     { color: '#29abe2', icon: '🚌' },
+  'Public Safety':      { color: '#c1272d', icon: '🚒' },
+  'Parks & Recreation': { color: '#8dc63f', icon: '🌳' },
+  'Education':          { color: '#f5a81c', icon: '📚' },
+  'Health':             { color: '#c2377f', icon: '🏥' },
+  'Utilities':          { color: '#2aa198', icon: '🚰' },
+  'Housing':            { color: '#7b3f98', icon: '🏢' },
+  'Culture':            { color: '#f7941d', icon: '🎭' },
+  'Economy':            { color: '#8a9a2b', icon: '💼' },
+  'Other':              { color: '#8b8c8e', icon: '📦' }
 };
 const catColor = c => (CATS[c] || CATS.Other).color;
 
@@ -371,11 +382,20 @@ const cityTier = n => ['Hamlet', 'Village', 'Town', 'City', 'Metropolis'][Math.m
 /* ════════════════════════════════════════════════════════════════════════════
    VIEW INFRASTRUCTURE
    ════════════════════════════════════════════════════════════════════════════ */
+/** Fan-of-leaves mark, drawn in the brand palette. */
+function logoMark(w = 64) {
+  const petals = [[-62, '#8dc63f', 44], [-42, '#f7941d', 50], [-22, '#29abe2', 56], [-4, '#c1272d', 58], [14, '#7b3f98', 56], [34, '#2aa198', 50], [54, '#f5a81c', 44]];
+  return `<svg width="${w}" height="${Math.round(w * .62)}" viewBox="0 0 120 74" aria-hidden="true" style="overflow:visible">
+    <path d="M4 64 Q60 40 116 64 Q60 54 4 64Z" fill="#8dc63f" opacity=".85"/>
+    ${petals.map(([a, c, l]) => `<path d="M0 0 C-8 -${l * .3} -6 -${l * .7} 0 -${l} C6 -${l * .7} 8 -${l * .3} 0 0Z" transform="translate(60 62) rotate(${a})" fill="${c}" opacity=".88" style="mix-blend-mode:multiply"/>`).join('')}
+  </svg>`;
+}
+
 const app = document.getElementById('app');
 let teardown = [];
 function cleanup() { teardown.forEach(f => { try { f(); } catch (e) { console.error(e); } }); teardown = []; }
 function splash(msg) {
-  return `<div class="min-h-screen bg-grid grid place-items-center"><div class="text-center"><div class="text-5xl mb-4 animate-bounce">🏙️</div><div class="text-slate-300 font-semibold">${esc(msg)}</div></div></div>`;
+  return `<div class="min-h-screen bg-grid grid place-items-center"><div class="text-center"><div class="mb-4 flex justify-center animate-bounce">${logoMark(84)}</div><div class="text-slate-500 font-semibold">${esc(msg)}</div></div></div>`;
 }
 function openModal(inner, cls = 'max-w-lg') {
   const m = document.createElement('div');
@@ -389,8 +409,8 @@ function openModal(inner, cls = 'max-w-lg') {
   return m;
 }
 const syncBadge = () => getFirebaseConfig()
-  ? `<span class="inline-flex items-center gap-2 text-xs font-semibold text-emerald-300"><span class="w-2 h-2 rounded-full bg-emerald-400"></span>Live sync (Firebase)</span>`
-  : `<span class="inline-flex items-center gap-2 text-xs font-semibold text-amber-300"><span class="w-2 h-2 rounded-full bg-amber-400"></span>Local demo mode</span>`;
+  ? `<span class="inline-flex items-center gap-2 text-xs font-semibold text-emerald-700"><span class="w-2 h-2 rounded-full bg-emerald-400"></span>Live sync (Firebase)</span>`
+  : `<span class="inline-flex items-center gap-2 text-xs font-semibold text-amber-600"><span class="w-2 h-2 rounded-full bg-amber-400"></span>Local demo mode</span>`;
 
 /* ════════════════════════════════════════════════════════════════════════════
    LANDING
@@ -440,23 +460,21 @@ function showLanding(notice) {
   const hashCode = ((location.hash.match(/join=([A-Za-z0-9]+)/) || [])[1] || '').toUpperCase();
   app.innerHTML = `
   <div class="min-h-screen bg-grid flex flex-col">
-    <header class="px-5 md:px-8 py-5 flex items-center justify-between">
-      <div class="flex items-center gap-3">
-        <div class="w-11 h-11 rounded-2xl bg-emerald-400 grid place-items-center text-2xl">🏙️</div>
-        <div>
-          <div class="font-display font-bold text-xl text-white leading-none">CityBudget<span class="text-emerald-400"> Live</span></div>
-          <div class="text-xs text-slate-400 mt-1">A municipal budgeting simulation, voted live by the room</div>
-        </div>
-      </div>
-      <button data-act="sync" class="btn btn-ghost !py-2 text-sm">${syncBadge()} <span class="text-slate-400">⚙</span></button>
+    <header class="px-5 md:px-8 pt-5 flex items-center justify-end">
+      <button data-act="sync" class="btn btn-ghost !py-2 text-sm">${syncBadge()} <span class="text-slate-500">⚙</span></button>
     </header>
-    ${notice ? `<div class="mx-auto w-full max-w-5xl px-4"><div class="rounded-xl bg-rose-500/15 border border-rose-400/30 text-rose-200 text-sm px-4 py-3 pop">${esc(notice)}</div></div>` : ''}
+    <div class="text-center px-4 pt-1 md:pt-2">
+      <div class="flex justify-center">${logoMark(150)}</div>
+      <h1 class="wordmark text-4xl md:text-6xl text-slate-600 mt-4">Our City</h1>
+      <div class="flex items-center justify-center gap-4 mt-3 text-slate-500"><span class="h-px w-10 bg-slate-300"></span><span class="wordmark text-xs md:text-sm">Budget it together</span><span class="h-px w-10 bg-slate-300"></span></div>
+    </div>
+    ${notice ? `<div class="mx-auto w-full max-w-5xl px-4"><div class="rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-sm px-4 py-3 pop">${esc(notice)}</div></div>` : ''}
     <main class="flex-1 grid place-items-center px-4 py-8">
       <div class="w-full max-w-5xl grid md:grid-cols-2 gap-6">
         <section class="panel p-7 md:p-9 flex flex-col">
           <div class="text-4xl mb-4">📽️</div>
-          <h1 class="font-display text-3xl md:text-4xl font-bold text-white leading-tight">Run the presentation</h1>
-          <p class="text-slate-400 mt-3 leading-relaxed">Project this screen. Set the budget and the project queue, then put each item to a live vote and watch the city fill in.</p>
+          <h2 class="font-display text-2xl md:text-3xl font-semibold text-white leading-tight">Run the presentation</h2>
+          <p class="text-slate-300 mt-3 leading-relaxed">Project this screen. Set the budget and the project queue, then put each item to a live vote and watch the city fill in.</p>
           <div class="mt-auto pt-8 space-y-3">
             <button data-act="host" class="btn btn-green w-full !text-lg !py-4">Launch host screen</button>
             ${lastHost ? `<button data-act="resume" class="btn btn-ghost w-full">Resume room <span class="num font-bold tracking-widest">${esc(lastHost)}</span></button>` : ''}
@@ -464,7 +482,7 @@ function showLanding(notice) {
         </section>
         <section class="card p-7 md:p-9 flex flex-col">
           <div class="text-4xl mb-4">🗳️</div>
-          <h2 class="font-display text-3xl md:text-4xl font-bold leading-tight">Vote from a table</h2>
+          <h2 class="font-display text-2xl md:text-3xl font-semibold leading-tight">Vote from a table</h2>
           <p class="text-slate-500 mt-3 leading-relaxed">Enter the room code shown on the main screen and name your table. One vote per table, per item.</p>
           <div class="mt-6 space-y-4">
             <div><label class="lbl" for="jCode">Room code</label>
@@ -506,7 +524,7 @@ function showSetup() {
   cleanup();
   const saved = store.get('civic:draft', null);
   const draft = saved || {
-    title: 'Imaginary City', budget: 15000000, duration: 30, baseline: true, autoEnd: false, autoContinue: 10,
+    title: 'Our City', budget: 15000000, duration: 30, baseline: true, autoEnd: false, autoContinue: 10,
     queue: PRESETS.filter(p => p.def).map(p => ({ id: p.id, name: p.name, cost: p.cost, category: p.category, icon: p.icon }))
   };
   const code = genCode();
@@ -515,11 +533,11 @@ function showSetup() {
 
   app.innerHTML = `
   <div class="min-h-screen bg-grid">
-    <header class="sticky top-0 z-30 bg-slate-950/80 backdrop-blur border-b border-white/5">
+    <header class="sticky top-0 z-30 bg-white/95 backdrop-blur border-b border-slate-200">
       <div class="max-w-7xl mx-auto px-4 md:px-6 h-16 flex items-center justify-between gap-3">
         <div class="flex items-center gap-3">
           <button data-act="back" class="btn btn-ghost !py-2 !px-3">← Back</button>
-          <div class="font-display font-bold text-white text-lg hidden sm:block">Host setup</div>
+          <div class="wordmark text-slate-600 text-base hidden sm:block">Host setup</div>
         </div>
         <div class="flex items-center gap-4"><span class="hidden md:block">${syncBadge()}</span>
           <button data-act="launch" id="sLaunch" class="btn btn-green !py-2.5">Launch presentation</button></div>
@@ -530,7 +548,9 @@ function showSetup() {
         <div class="card p-6">
           <h2 class="font-display text-xl font-bold mb-4">Session</h2>
           <div class="space-y-4">
-            <div><label class="lbl" for="sTitle">City name</label><input id="sTitle" class="field" maxlength="40" value="${esc(draft.title)}"></div>
+            <div><label class="lbl" for="sTitle">Name your city</label>
+              <input id="sTitle" class="field !text-xl !font-semibold" maxlength="32" placeholder="e.g. Garden City" value="${esc(draft.title)}">
+              <p class="text-xs text-slate-500 mt-1.5">Shown on the big screen, on every table, and in the final summary. You can rename it during the session.</p></div>
             <div><label class="lbl" for="sBudget">Starting budget</label>
               <input id="sBudget" class="field num !text-xl !font-bold" inputmode="numeric" value="${esc(fmt(draft.budget))}">
               <div class="flex flex-wrap gap-2 mt-2">${[5e6, 10e6, 15e6, 25e6, 50e6].map(v => `<button data-act="bud" data-v="${v}" class="chip bg-slate-100 text-slate-700 hover:bg-emerald-100 cursor-pointer">${fmtShort(v)}</button>`).join('')}</div></div>
@@ -656,7 +676,7 @@ function showSetup() {
         if (!draft.queue.length) { toast('Add at least one project to the queue', 'error'); return; }
         save();
         showHost(code, {
-          v: 1, code, title: draft.title || 'Imaginary City', startingBudget: draft.budget, spent: 0, baseline: !!draft.baseline,
+          v: 1, code, title: (draft.title || '').trim() || 'Our City', startingBudget: draft.budget, spent: 0, baseline: !!draft.baseline,
           autoEnd: !!draft.autoEnd, autoContinue: +draft.autoContinue || 0, durationSec: +draft.duration || 30,
           queue: draft.queue.map(q => ({ id: q.id, name: q.name, cost: +q.cost, category: q.category, icon: q.icon || '📦' })),
           idx: 0, placed: [], decisions: [], phase: 'idle', voteId: null, endsAt: null, durationMs: 0, result: null, rev: 0, createdAt: Date.now()
@@ -718,17 +738,17 @@ async function showHost(code, initial, isNew) {
   /* ---- skeleton ---- */
   app.innerHTML = `
   <div class="min-h-screen lg:h-screen flex flex-col bg-grid lg:overflow-hidden">
-    <header class="shrink-0 h-14 px-4 flex items-center justify-between gap-3 border-b border-white/5 bg-slate-950/60 backdrop-blur">
+    <header class="shrink-0 h-16 px-4 flex items-center justify-between gap-3 border-b border-slate-200 bg-white">
       <div class="flex items-center gap-3 min-w-0">
-        <div class="w-8 h-8 rounded-xl bg-emerald-400 grid place-items-center text-lg">🏙️</div>
-        <div class="font-display font-bold text-white truncate">${esc(state.title)}</div>
+        ${logoMark(54)}
+        <div class="wordmark text-lg text-slate-600 truncate">Our City</div>
       </div>
-      <button data-act="join" class="flex items-center gap-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 px-4 py-1.5" title="Show join instructions">
-        <span class="text-xs font-semibold text-slate-400">Join code</span>
-        <span class="num text-2xl font-bold text-white tracking-[.3em] leading-none">${esc(code)}</span>
+      <button data-act="join" class="flex items-center gap-3 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 px-4 py-1.5" title="Show join instructions">
+        <span class="text-xs font-semibold text-slate-500">Join code</span>
+        <span class="num text-2xl font-bold text-slate-700 tracking-[.3em] leading-none">${esc(code)}</span>
       </button>
       <div class="flex items-center gap-2">
-        <div id="hConn" class="hidden md:flex items-center gap-2 text-xs font-semibold text-slate-300 mr-2"></div>
+        <div id="hConn" class="hidden md:flex items-center gap-2 text-xs font-semibold text-slate-600 mr-2"></div>
         <button data-act="sound" id="hSound" class="btn btn-ghost !py-1.5 !px-3" title="Sound on/off"></button>
         <button data-act="fs" class="btn btn-ghost !py-1.5 !px-3" title="Fullscreen">⛶</button>
         <button data-act="menu" class="btn btn-ghost !py-1.5 !px-3" title="Session menu">⋯</button>
@@ -749,9 +769,12 @@ async function showHost(code, initial, isNew) {
         <div id="cVote" class="panel p-5 xl:p-6 shrink-0"></div>
         <div id="cNext" class="shrink-0 px-1 pb-1"></div>
       </section>
-      <section class="lg:col-span-7 min-h-0 flex flex-col panel p-4 xl:p-5">
-        <div class="flex items-center justify-between gap-3 mb-3 shrink-0">
-          <div><div class="font-display text-xl xl:text-2xl font-bold text-white">Imaginary City</div><div id="cSub" class="text-sm text-slate-400"></div></div>
+      <section class="lg:col-span-7 min-h-0 flex flex-col card p-4 xl:p-5">
+        <div class="flex items-start justify-between gap-3 mb-3 shrink-0">
+          <div class="min-w-0">
+            <div id="cTitle" class="wordmark text-2xl xl:text-4xl text-slate-600 truncate"></div>
+            <div class="flex items-center gap-3 mt-2 text-slate-500"><span class="h-px w-8 bg-slate-300"></span><span id="cSub" class="text-xs xl:text-sm font-medium"></span></div>
+          </div>
           <div id="cStats" class="flex gap-2 flex-wrap justify-end"></div>
         </div>
         <div id="cGrid" class="flex-1 min-h-0"></div>
@@ -835,7 +858,7 @@ async function showHost(code, initial, isNew) {
     setHTML($('#cItem'), `
       <div class="flex items-center justify-between mb-3">
         <span class="chip" style="background:${c}26;color:#0f172a;border-color:${c}">${esc(it.category)}</span>
-        <span class="text-xs font-semibold ${live ? 'text-emerald-600' : 'text-slate-400'}">${live ? '● Voting open' : state.phase === 'result' ? 'Decision made' : 'Up for vote'} · Item ${state.idx + 1} of ${n}</span>
+        <span class="text-xs font-semibold ${live ? 'text-emerald-600' : 'text-slate-500'}">${live ? '● Voting open' : state.phase === 'result' ? 'Decision made' : 'Up for vote'} · Item ${state.idx + 1} of ${n}</span>
       </div>
       <div class="flex items-center gap-5">
         <div class="w-24 h-24 xl:w-36 xl:h-36 shrink-0 rounded-3xl grid place-items-center text-6xl xl:text-8xl ${live ? 'glow' : ''}" style="background:${c}1f;border:2px solid ${c}66">${iconHTML(it.icon)}</div>
@@ -852,28 +875,28 @@ async function showHost(code, initial, isNew) {
     const total = Math.max(online, voted);
     const chips = visible.length ? visible.map(t => {
       const inVote = state.phase === 'voting' || state.phase === 'result';
-      const cls = t.voted ? 'bg-emerald-400/20 text-emerald-200 border-emerald-400/40' : t.online ? 'bg-white/5 text-slate-200 border-white/10' : 'bg-white/5 text-slate-500 border-white/5';
+      const cls = t.voted ? 'bg-emerald-400/20 text-emerald-200 border-emerald-400/40' : t.online ? 'bg-white/5 text-slate-200 border-white/10' : 'bg-white/5 text-slate-400 border-white/5';
       return `<span class="chip ${cls} !text-xs">${inVote ? (t.voted ? '✓' : '…') : '●'} ${esc(t.name)}</span>`;
-    }).join('') : `<span class="text-sm text-slate-400">No tables yet. Tables join with code <b class="text-white num tracking-widest">${esc(code)}</b>.</span>`;
+    }).join('') : `<span class="text-sm text-slate-300">No tables yet. Tables join with code <b class="text-white num tracking-widest">${esc(code)}</b>.</span>`;
     let top = '';
     if (state.phase === 'idle') {
       const it = curItem();
       top = `<div class="flex gap-3 items-stretch">
         <button data-act="start" class="btn btn-green flex-1 !text-xl xl:!text-2xl !py-4 xl:!py-5 !rounded-2xl" ${it ? '' : 'disabled'}>▶ Start vote</button>
         <select id="vDur" class="rounded-2xl bg-slate-800 text-white font-bold px-3 border border-white/10" aria-label="Vote length">${[15, 20, 30, 45, 60, 90].map(v => `<option value="${v}" ${v === durSec ? 'selected' : ''}>${v}s</option>`).join('')}</select>
-      </div><div class="text-xs text-slate-400 mt-2">Press Space to start · ${online} ${online === 1 ? 'table' : 'tables'} connected</div>`;
+      </div><div class="text-xs text-slate-300 mt-2">Press Space to start · ${online} ${online === 1 ? 'table' : 'tables'} connected</div>`;
     } else if (state.phase === 'voting') {
       top = `<div class="flex items-center gap-5">
         <div id="vTime" class="num text-7xl xl:text-8xl font-bold text-white leading-none w-28 xl:w-36 text-center">--</div>
         <div class="flex-1 min-w-0">
-          <div class="text-sm font-semibold text-emerald-300 mb-2">Voting is open</div>
-          <div class="h-4 rounded-full bg-slate-700 overflow-hidden"><div id="vBar" class="h-full rounded-full bg-emerald-400" style="width:100%"></div></div>
+          <div class="text-sm font-semibold text-emerald-200 mb-2">Voting is open</div>
+          <div class="h-4 rounded-full bg-white/20 overflow-hidden"><div id="vBar" class="h-full rounded-full bg-emerald-400" style="width:100%"></div></div>
         </div></div>
         <div class="mt-4 flex items-center justify-between gap-3">
           <div><span class="num text-3xl font-bold text-white">${voted}</span><span class="text-slate-300 font-semibold"> of ${total} ${total === 1 ? 'table has' : 'tables have'} voted</span></div>
           <button data-act="end" class="btn btn-ghost !py-2 text-sm">End vote now</button>
         </div>
-        <div class="flex gap-1.5 mt-2">${Array.from({ length: Math.max(total, 1) }, (_, i) => `<div class="h-2 flex-1 rounded-full ${i < voted ? 'bg-emerald-400' : 'bg-slate-700'}"></div>`).join('')}</div>`;
+        <div class="flex gap-1.5 mt-2">${Array.from({ length: Math.max(total, 1) }, (_, i) => `<div class="h-2 flex-1 rounded-full ${i < voted ? 'bg-emerald-400' : 'bg-white/20'}"></div>`).join('')}</div>`;
     } else if (state.phase === 'result') {
       top = `<div class="flex items-center justify-between gap-3"><div class="text-slate-300 font-semibold">Result is on screen</div><button data-act="continue" class="btn btn-green">Continue</button></div>`;
     } else {
@@ -885,7 +908,7 @@ async function showHost(code, initial, isNew) {
   function renderNext() {
     const up = state.queue.slice(state.idx + 1, state.idx + 7);
     setHTML($('#cNext'), up.length && state.phase !== 'finished'
-      ? `<div class="text-xs font-semibold text-slate-400 mb-2">Up next</div><div class="flex gap-2 flex-wrap items-center">${up.map(q => `<div class="flex items-center gap-2 rounded-xl bg-white/5 border border-white/10 px-2.5 py-1.5" title="${esc(q.name)} · ${fmt(q.cost)}"><span class="text-xl leading-none">${iconHTML(q.icon)}</span><span class="text-xs font-semibold text-slate-300 max-w-[7rem] truncate">${esc(q.name)}</span></div>`).join('')}${state.queue.length - state.idx - 1 > 6 ? `<span class="text-xs text-slate-500">+${state.queue.length - state.idx - 7} more</span>` : ''}</div>` : '');
+      ? `<div class="text-xs font-semibold text-slate-500 mb-2">Up next</div><div class="flex gap-2 flex-wrap items-center">${up.map(q => `<div class="flex items-center gap-2 rounded-xl bg-white border border-slate-200 px-2.5 py-1.5" title="${esc(q.name)} · ${fmt(q.cost)}"><span class="text-xl leading-none">${iconHTML(q.icon)}</span><span class="text-xs font-semibold text-slate-600 max-w-[7rem] truncate">${esc(q.name)}</span></div>`).join('')}${state.queue.length - state.idx - 1 > 6 ? `<span class="text-xs text-slate-500">+${state.queue.length - state.idx - 7} more</span>` : ''}</div>` : '');
   }
   function renderCity() {
     const { rows } = gridDims(state);
@@ -906,10 +929,11 @@ async function showHost(code, initial, isNew) {
       }).join('')}</div>`;
     }
     const n = visible.length, inv = visible.reduce((a, p) => a + p.cost, 0);
+    $('#cTitle').textContent = state.title; document.title = state.title + ' · Our City';
     $('#cSub').textContent = `${cityTier(n)} · ${n === 0 ? 'nothing built yet. Every approved project lands here.' : n + ' ' + (n === 1 ? 'project' : 'projects') + ' built'}`;
-    setHTML($('#cStats'), `<span class="chip bg-emerald-400/15 text-emerald-300 border-emerald-400/30 !text-sm">${fmt(inv)} invested</span>`);
+    setHTML($('#cStats'), `<span class="chip bg-emerald-50 text-emerald-700 border-emerald-200 !text-sm">${fmt(inv)} invested</span>`);
     const counts = {}; visible.forEach(p => counts[p.category] = (counts[p.category] || 0) + 1);
-    setHTML($('#cLegend'), Object.entries(counts).map(([k, v]) => `<span class="chip !text-xs" style="background:${catColor(k)}22;color:#e2e8f0;border-color:${catColor(k)}66"><span class="w-2 h-2 rounded-full" style="background:${catColor(k)}"></span>${esc(k)} ${v}</span>`).join(''));
+    setHTML($('#cLegend'), Object.entries(counts).map(([k, v]) => `<span class="chip !text-xs" style="background:${catColor(k)}22;color:#38393b;border-color:${catColor(k)}88"><span class="w-2 h-2 rounded-full" style="background:${catColor(k)}"></span>${esc(k)} ${v}</span>`).join(''));
   }
   function renderOverlay() {
     const el = $('#hOverlay');
@@ -984,7 +1008,7 @@ async function showHost(code, initial, isNew) {
     const now = transport.now();
     if (state.phase === 'voting') {
       const left = Math.max(0, state.endsAt - now), sec = Math.ceil(left / 1000);
-      const t = $('#vTime'); if (t) { t.textContent = sec; t.className = t.className.replace(/text-(white|rose-400)/, sec <= 10 ? 'text-rose-400' : 'text-white'); }
+      const t = $('#vTime'); if (t) { t.textContent = sec; t.className = t.className.replace(/text-(white|rose-300)/, sec <= 10 ? 'text-rose-300' : 'text-white'); }
       const b = $('#vBar'); if (b) { b.style.width = (left / (state.durationMs || 1) * 100) + '%'; b.className = 'h-full rounded-full ' + (sec <= 10 ? 'bg-rose-400' : 'bg-emerald-400'); }
       if (renderOnly) return;
       if (sec <= 5 && sec > 0 && sec !== lastBeep) { lastBeep = sec; beep(880, .08, 'square', .04); }
@@ -1042,11 +1066,13 @@ async function showHost(code, initial, isNew) {
     const m = openModal(`<div class="p-6">
       <div class="flex items-center justify-between mb-4"><h2 class="font-display text-xl font-bold">Session controls</h2><button data-close class="btn btn-light !px-3 !py-1.5">✕</button></div>
       <div class="space-y-2">
+        <button id="mRename" class="btn btn-light w-full !justify-start">✎ Rename the city</button>
         <button id="mSkip" class="btn btn-light w-full !justify-start">↷ Skip current item (move it to the end of the queue)</button>
         <button id="mFinish" class="btn btn-light w-full !justify-start">🏁 Finish session now</button>
         <button id="mNew" class="btn btn-light w-full !justify-start">⟲ Close room and start a new setup</button>
         <button id="mExit" class="btn btn-light w-full !justify-start">⏏ Leave to home screen (room stays open)</button>
       </div></div>`);
+    $('#mRename', m).onclick = () => { m.close(); const nn = prompt('Name your city', state.title); if (nn && nn.trim()) commit(s => { s.title = nn.trim().slice(0, 32); }); };
     $('#mSkip', m).onclick = () => { m.close(); skipItem(); };
     $('#mFinish', m).onclick = () => { m.close(); if (state.phase === 'idle') finishSession(); else toast('Wait for the current vote to finish first'); };
     $('#mNew', m).onclick = () => { m.close(); if (confirm('Close this room and start a new setup?')) { transport.set('state', null); store.del('civic:lastHost'); showSetup(); } };
@@ -1109,9 +1135,10 @@ async function showTable(code, name) {
   function header() {
     const on = connected && hostOnline();
     return `<header class="flex items-center justify-between gap-3 px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-3">
-      <div class="flex items-center gap-2 min-w-0"><span class="chip bg-emerald-400 text-emerald-950 !text-sm !px-3 !py-1 truncate max-w-[12rem]">${esc(name)}</span><span class="num text-white font-bold tracking-widest">${esc(code)}</span></div>
-      <div class="flex items-center gap-3"><span class="inline-flex items-center gap-1.5 text-xs font-semibold ${on ? 'text-emerald-300' : 'text-amber-300'}"><span class="w-2 h-2 rounded-full ${on ? 'bg-emerald-400' : 'bg-amber-400 animate-pulse'}"></span>${!connected ? 'Reconnecting…' : hostOnline() ? 'Connected' : 'Host offline'}</span>
-      <button data-act="leave" class="text-xs text-slate-400 underline">Leave</button></div></header>`;
+      <div class="flex items-center gap-2 min-w-0"><span class="chip bg-emerald-400 text-emerald-950 !text-sm !px-3 !py-1 truncate max-w-[12rem]">${esc(name)}</span><span class="num text-slate-700 font-bold tracking-widest">${esc(code)}</span></div>
+      <div class="flex items-center gap-3"><span class="inline-flex items-center gap-1.5 text-xs font-semibold ${on ? 'text-emerald-700' : 'text-amber-600'}"><span class="w-2 h-2 rounded-full ${on ? 'bg-emerald-400' : 'bg-amber-400 animate-pulse'}"></span>${!connected ? 'Reconnecting…' : hostOnline() ? 'Connected' : 'Host offline'}</span>
+      <button data-act="leave" class="text-xs text-slate-500 underline">Leave</button></div></header>
+      <div class="px-4 pb-3 text-center flex flex-col items-center">${logoMark(44)}<div class="wordmark text-lg text-slate-600 truncate max-w-full mt-1">${esc(state.title)}</div></div>`;
   }
   function budgetCard(extra = '') {
     const rem = remaining(state), pct = Math.max(0, Math.min(100, rem / state.startingBudget * 100));
@@ -1129,8 +1156,8 @@ async function showTable(code, name) {
   }
   function cityStrip() {
     const p = state.placed;
-    return `<div class="panel p-4 mt-auto"><div class="text-xs font-semibold text-slate-400 mb-2">Your city so far · ${p.length} ${p.length === 1 ? 'project' : 'projects'}</div>
-      <div class="flex flex-wrap gap-1.5">${p.length ? p.map(x => `<span class="w-10 h-10 rounded-xl grid place-items-center text-2xl" style="background:${catColor(x.category)}2e;border:1.5px solid ${catColor(x.category)}88" title="${esc(x.name)}">${iconHTML(x.icon)}</span>`).join('') : '<span class="text-sm text-slate-500">Nothing built yet.</span>'}</div></div>`;
+    return `<div class="panel p-4 mt-auto"><div class="text-xs font-semibold text-slate-300 mb-2">Your city so far · ${p.length} ${p.length === 1 ? 'project' : 'projects'}</div>
+      <div class="flex flex-wrap gap-1.5">${p.length ? p.map(x => `<span class="w-10 h-10 rounded-xl grid place-items-center text-2xl" style="background:${catColor(x.category)}2e;border:1.5px solid ${catColor(x.category)}88" title="${esc(x.name)}">${iconHTML(x.icon)}</span>`).join('') : '<span class="text-sm text-slate-300">Nothing built yet.</span>'}</div></div>`;
   }
 
   function body() {
@@ -1185,7 +1212,7 @@ async function showTable(code, name) {
 
     // idle
     const last = s.result && s.decisions.length
-      ? `<div class="panel p-4 flex items-center gap-3"><span class="text-2xl">${s.result.passed ? '✅' : '❌'}</span><div class="min-w-0"><div class="text-xs font-semibold text-slate-400">Last decision</div><div class="font-semibold text-white truncate">${esc(s.result.name)} ${s.result.passed ? 'passed' : 'did not pass'} (${s.result.yes}–${s.result.no})</div></div></div>` : '';
+      ? `<div class="panel p-4 flex items-center gap-3"><span class="text-2xl">${s.result.passed ? '✅' : '❌'}</span><div class="min-w-0"><div class="text-xs font-semibold text-slate-300">Last decision</div><div class="font-semibold text-white truncate">${esc(s.result.name)} ${s.result.passed ? 'passed' : 'did not pass'} (${s.result.yes}–${s.result.no})</div></div></div>` : '';
     return `${budgetCard()}
       <div class="card p-6 text-center pop"><div class="text-5xl mb-2">⏳</div><h2 class="font-display text-2xl font-bold">Waiting for the next vote</h2>
         <p class="text-slate-500 mt-1">Keep this screen open. It updates the moment the host starts.</p>
@@ -1193,7 +1220,7 @@ async function showTable(code, name) {
   }
 
   function render() {
-    if (!state) { setHTML(root, `<div class="min-h-screen grid place-items-center p-6 text-center"><div><div class="text-5xl mb-3">👋</div><div class="text-white font-display text-2xl font-bold">The host closed this session</div><button data-act="leave" class="btn btn-green mt-5">Back to home</button></div></div>`); return; }
+    if (!state) { setHTML(root, `<div class="min-h-screen grid place-items-center p-6 text-center"><div><div class="text-5xl mb-3">👋</div><div class="text-slate-700 font-display text-2xl font-bold">The host closed this session</div><button data-act="leave" class="btn btn-green mt-5">Back to home</button></div></div>`); return; }
     setHTML(root, `<div class="min-h-screen flex flex-col max-w-xl md:max-w-2xl mx-auto w-full">${header()}<main class="flex-1 flex flex-col gap-4 px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))]">${body()}${cityStrip()}</main></div>`);
     tick();
   }
