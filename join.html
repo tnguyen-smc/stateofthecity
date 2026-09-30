@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Join a table – Our City</title>
+<!-- Table join link: forwards to the main app's table page, keeping ?code=ABCD if present. -->
+<script>
+  location.replace('./?join' + (location.search ? '&' + location.search.slice(1) : '') + location.hash);
+</script>
+<noscript><meta http-equiv="refresh" content="0; url=./?join"></noscript>
+</head>
+<body style="font-family:system-ui;padding:2rem;color:#4a4b4d">Opening the table page… <a href="./?join">Tap here if nothing happens</a>.</body>
+</html>

@@ -4,20 +4,17 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#f6f7f4">
-<title>Our City – Live Budgeting Simulation</title>
+<title>Our City</title>
 
 <!--
-  ┌──────────────────────────────────────────────────────────────────────────┐
-  │ Our City — single-file app (no build step)                                │
-  │                                                                          │
-  │ DEPLOY:  save as index.html → push to GitHub → GitHub Pages / Cloudflare │
-  │          Pages (build command: none, output dir: /).                     │
-  │                                                                          │
-  │ SYNC:    Works out of the box in "Local demo mode" (tabs in one browser).│
-  │          For real multi-device play, connect a free Firebase Realtime    │
-  │          Database: either paste its URL in the app (⚙ Sync settings) or  │
-  │          hard-code it in FIREBASE_CONFIG below so every device has it.   │
-  └──────────────────────────────────────────────────────────────────────────┘
+  Our City — single-file app (no build step)
+
+  FILES TO DEPLOY (same folder):
+    index.html   – this file: host screen + table screen
+    join.html    – tiny redirect, gives tables a clean link  (yoursite/join.html)
+    citylogo.png – your logo (falls back to the words "Our City" if missing)
+
+  Sync: Firebase Realtime Database, URL hard-coded below (FIREBASE_URL).
 -->
 
 <script src="https://cdn.tailwindcss.com"></script>
@@ -32,11 +29,8 @@
         sans: ['Montserrat', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif']
       },
       colors: {
-        /* warm charcoal greys, like the logo lettering */
         slate: { 50:'#f7f7f5',100:'#eeefeb',200:'#e0e1dc',300:'#c9cac5',400:'#9d9e9a',500:'#77787a',600:'#58595b',700:'#4a4b4d',800:'#38393b',900:'#2a2b2c',950:'#1a1a1b' },
-        /* leaf green = YES / money left */
         emerald: { 50:'#f4f9e8',100:'#e5f2c6',200:'#cfe69b',300:'#b4d86a',400:'#9bcb45',500:'#6fa821',600:'#5a8f17',700:'#4a7a12',800:'#3b5f12',900:'#2f4c12',950:'#1c2f08' },
-        /* crimson = NO / money spent */
         rose: { 50:'#fdf0f0',100:'#fadcdc',200:'#f4b8b9',300:'#ea8b8d',400:'#dc5a5e',500:'#c8323a',600:'#b02229',700:'#8f1a20',800:'#721519',900:'#5a1215',950:'#330a0c' }
       }
     } }
@@ -71,24 +65,28 @@
   .btn-green { background:#8dc63f; color:#1f330a; } .btn-green:hover:not(:disabled){ filter:brightness(1.07); }
   .btn-dark { background:#4a4b4d; color:#fff; } .btn-dark:hover:not(:disabled){ background:#38393b; }
   .btn-ghost { background:rgba(74,75,77,.08); color:#4a4b4d; } .btn-ghost:hover:not(:disabled){ background:rgba(74,75,77,.15); }
-  .panel .btn-ghost { background:rgba(255,255,255,.14); color:#fff; } .panel .btn-ghost:hover:not(:disabled){ background:rgba(255,255,255,.25); }
+  .panel .btn-ghost, .bar-dark .btn-ghost { background:rgba(255,255,255,.14); color:#fff; } .panel .btn-ghost:hover:not(:disabled), .bar-dark .btn-ghost:hover:not(:disabled){ background:rgba(255,255,255,.25); }
   .btn-light { background:#eeefeb; color:#38393b; } .btn-light:hover:not(:disabled){ background:#e0e1dc; }
-  .btn-red { background:#c8323a; color:#fff; }
   :focus-visible { outline: 3px solid #29abe2; outline-offset: 2px; }
 
   /* ---- The city ---- */
   .city-grid { display:grid; gap:10px; padding:14px; height:100%; min-height:340px; border-radius:1rem;
     background-color:#f3f4f0; background-image: radial-gradient(rgba(74,75,77,.13) 1px, transparent 1px); background-size: 18px 18px;
     border:1px solid #e6e7e2; }
-  .lot { border-radius:14px; border:1.5px dashed rgba(74,75,77,.2); background: rgba(74,75,77,.025); }
-  .tile { position:relative; min-width:0; min-height:0; border-radius:14px; border:1.5px solid var(--cb);
+  .lot { display:block; border-radius:14px; border:1.5px dashed rgba(74,75,77,.2); background: rgba(74,75,77,.025); min-width:0; min-height:0; }
+  .lot-hot { cursor:pointer; border:2px dashed #8dc63f; background: rgba(141,198,63,.12); animation: hot 1.4s ease-in-out infinite; }
+  .lot-hot:hover { background: rgba(141,198,63,.38); animation: none; }
+  @keyframes hot { 0%,100%{ background: rgba(141,198,63,.08) } 50%{ background: rgba(141,198,63,.26) } }
+  .tile { position:relative; min-width:0; min-height:0; border-radius:14px; border:1.5px solid var(--cb); cursor:pointer;
     background: linear-gradient(160deg, var(--c1), var(--c2)), #fff; display:flex; flex-direction:column; align-items:center; justify-content:center;
-    gap:.25rem; padding:.35rem; text-align:center; overflow:hidden; box-shadow: 0 10px 20px -14px var(--cb); }
-  .tile-icon { font-size: clamp(1.5rem, 3.3vw, 3.8rem); line-height:1; }
-  .tile-name { font-size: clamp(.6rem, .85vw, .95rem); font-weight:700; color:#38393b; line-height:1.15; max-width:100%; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
-  .tile-cost { font-size: clamp(.55rem,.75vw,.85rem); font-weight:700; color:#5a8f17; }
-  .tile-tag { font-size:.6rem; font-weight:600; color:#8b8c8e; }
-  .tile-base { filter: saturate(.3); opacity:.85; }
+    gap:.25rem; padding:.35rem; text-align:center; overflow:hidden; box-shadow: 0 10px 20px -14px var(--cb); transition: box-shadow .15s; }
+  .tile:hover { box-shadow: 0 0 0 3px rgba(41,171,226,.35); }
+  .tile-sel { box-shadow: 0 0 0 4px #29abe2, 0 12px 26px -10px rgba(41,171,226,.7) !important; z-index:3; }
+  .tile-icon { font-size: clamp(1.5rem, 3.3vw, 3.8rem); line-height:1; pointer-events:none; }
+  .tile-name { font-size: clamp(.6rem, .85vw, .95rem); font-weight:700; color:#38393b; line-height:1.15; max-width:100%; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; pointer-events:none; }
+  .tile-cost { font-size: clamp(.55rem,.75vw,.85rem); font-weight:700; color:#5a8f17; pointer-events:none; }
+  .tile-tag { font-size:.6rem; font-weight:600; color:#8b8c8e; pointer-events:none; }
+  .tile-base { filter: saturate(.3); opacity:.88; }
   .ico-img { width:1em; height:1em; object-fit:contain; border-radius:.2em; display:block; }
 
   /* ---- Motion ---- */
@@ -101,8 +99,6 @@
   .fade-in { animation: fadeIn .25s ease both; }
   @keyframes grow { from{width:0} to{width:var(--w)} }
   .grow { animation: grow 1.1s .25s cubic-bezier(.2,.8,.2,1) both; }
-  @keyframes drain { from{width:100%} to{width:0} }
-  .drain { animation: drain linear forwards; }
   @keyframes confetti { to { transform: translate(var(--dx), 110vh) rotate(var(--rot)); opacity:1 } }
   @keyframes glow { 0%,100%{box-shadow:0 0 0 0 rgba(141,198,63,0)} 50%{box-shadow:0 0 0 9px rgba(141,198,63,.3)} }
   .glow { animation: glow 1.6s ease-in-out infinite; }
@@ -110,11 +106,9 @@
   .dot-a { animation: dots 1.4s infinite; } .dot-b { animation: dots 1.4s .2s infinite; } .dot-c { animation: dots 1.4s .4s infinite; }
   @keyframes checkPop { 0%{transform:scale(0) rotate(-30deg)} 70%{transform:scale(1.15) rotate(6deg)} 100%{transform:scale(1) rotate(0)} }
   .check-pop { animation: checkPop .5s cubic-bezier(.2,1.3,.3,1) both; }
-  @keyframes fan { from{transform:translate(60px,60px) rotate(0) scale(.2);opacity:0} }
   .vote-btn { border-radius: 1.75rem; font-weight: 800; color:#fff; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:.25rem;
     border-bottom: 10px solid rgba(0,0,0,.25); transition: transform .08s, border-width .08s, filter .15s; touch-action: manipulation; user-select:none; }
   .vote-btn:active:not(:disabled) { transform: translateY(6px); border-bottom-width: 4px; }
-  .vote-btn:disabled { filter: grayscale(.8) brightness(.8); }
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation-duration: .01ms !important; animation-delay: 0ms !important; transition-duration: .01ms !important; }
   }
@@ -122,7 +116,7 @@
 </head>
 <body>
 <div id="app"></div>
-<noscript><p style="padding:2rem;color:#fff">This app needs JavaScript.</p></noscript>
+<noscript><p style="padding:2rem">This app needs JavaScript.</p></noscript>
 
 <script>
 'use strict';
@@ -130,13 +124,14 @@
 /* ════════════════════════════════════════════════════════════════════════════
    CONFIG
    ════════════════════════════════════════════════════════════════════════════ */
-// Optional: hard-code your Firebase Realtime Database URL so every device uses it automatically.
-// Example: { databaseURL: 'https://my-project-default-rtdb.firebaseio.com' }
-const FIREBASE_CONFIG = null;
+const FIREBASE_URL = 'https://our-city-gcks-default-rtdb.firebaseio.com';
+const LOGO_SRC = 'citylogo.png';
 
 const COLS = 6;
 const HEARTBEAT_MS = 5000;
 const STALE_MS = 16000;
+const KEY_DRAFT = 'civic:draft2';
+const KEY_LIB = 'civic:library2';
 
 const CATS = {
   'Transportation':     { color: '#29abe2', icon: '🚌' },
@@ -152,33 +147,34 @@ const CATS = {
 };
 const catColor = c => (CATS[c] || CATS.Other).color;
 
+/* Starter library (editable and removable in Host setup; saved in the browser). */
 const PRESETS = [
-  { id: 'p_brt',   name: 'Bus Rapid Transit Line',       cost: 2400000, category: 'Transportation',     icon: '🚌', def: true },
-  { id: 'p_bike',  name: 'Protected Bike Lanes',         cost: 800000,  category: 'Transportation',     icon: '🚲', def: true },
-  { id: 'p_bridge',name: 'Bridge Repair & Rehab',        cost: 3200000, category: 'Transportation',     icon: '🌉', def: true },
-  { id: 'p_sig',   name: 'Smart Traffic Signals',        cost: 1100000, category: 'Transportation',     icon: '🚦' },
-  { id: 'p_fire',  name: 'New Fire Station',             cost: 2800000, category: 'Public Safety',      icon: '🚒', def: true },
-  { id: 'p_disp',  name: 'Emergency Dispatch Upgrade',   cost: 900000,  category: 'Public Safety',      icon: '🚨' },
-  { id: 'p_park',  name: 'Riverfront Park',              cost: 1800000, category: 'Parks & Recreation', icon: '🌳', def: true },
-  { id: 'p_pool',  name: 'Community Pool',               cost: 2200000, category: 'Parks & Recreation', icon: '🏊', def: true },
-  { id: 'p_play',  name: 'Playground Renovations',       cost: 500000,  category: 'Parks & Recreation', icon: '🛝', def: true },
-  { id: 'p_lib',   name: 'Library Expansion',            cost: 1600000, category: 'Education',          icon: '📚', def: true },
-  { id: 'p_after', name: 'After-School Learning Center', cost: 700000,  category: 'Education',          icon: '🎒' },
-  { id: 'p_clinic',name: 'Community Health Clinic',      cost: 2000000, category: 'Health',             icon: '🏥', def: true },
-  { id: 'p_water', name: 'Water Main Replacement',       cost: 2600000, category: 'Utilities',          icon: '🚰', def: true },
-  { id: 'p_solar', name: 'Solar on City Buildings',      cost: 1400000, category: 'Utilities',          icon: '☀️', def: true },
-  { id: 'p_fiber', name: 'Public Broadband Network',     cost: 1900000, category: 'Utilities',          icon: '📡' },
-  { id: 'p_house', name: 'Affordable Housing Complex',   cost: 3500000, category: 'Housing',            icon: '🏢', def: true },
-  { id: 'p_arts',  name: 'Arts & Performance Center',    cost: 1700000, category: 'Culture',            icon: '🎭' },
-  { id: 'p_biz',   name: 'Small Business Incubator',     cost: 1000000, category: 'Economy',            icon: '💼' }
+  { id: 'p_brt',   name: 'Bus Rapid Transit Line',       cost: 2400000, category: 'Transportation',     icon: '🚌', tiles: 1 },
+  { id: 'p_road',  name: 'Road Resurfacing',             cost: 600000,  category: 'Transportation',     icon: '🛣️', tiles: 4 },
+  { id: 'p_bike',  name: 'Protected Bike Lanes',         cost: 800000,  category: 'Transportation',     icon: '🚲', tiles: 2 },
+  { id: 'p_bridge',name: 'Bridge Repair & Rehab',        cost: 3200000, category: 'Transportation',     icon: '🌉', tiles: 1 },
+  { id: 'p_sig',   name: 'Smart Traffic Signals',        cost: 1100000, category: 'Transportation',     icon: '🚦', tiles: 1 },
+  { id: 'p_fire',  name: 'New Fire Station',             cost: 2800000, category: 'Public Safety',      icon: '🚒', tiles: 1 },
+  { id: 'p_disp',  name: 'Emergency Dispatch Upgrade',   cost: 900000,  category: 'Public Safety',      icon: '🚨', tiles: 1 },
+  { id: 'p_park',  name: 'Riverfront Park',              cost: 1800000, category: 'Parks & Recreation', icon: '🌳', tiles: 1 },
+  { id: 'p_pool',  name: 'Community Pool',               cost: 2200000, category: 'Parks & Recreation', icon: '🏊', tiles: 1 },
+  { id: 'p_play',  name: 'Playground Renovations',       cost: 500000,  category: 'Parks & Recreation', icon: '🛝', tiles: 1 },
+  { id: 'p_lib',   name: 'Library Expansion',            cost: 1600000, category: 'Education',          icon: '📚', tiles: 1 },
+  { id: 'p_after', name: 'After-School Learning Center', cost: 700000,  category: 'Education',          icon: '🎒', tiles: 1 },
+  { id: 'p_clinic',name: 'Community Health Clinic',      cost: 2000000, category: 'Health',             icon: '🏥', tiles: 1 },
+  { id: 'p_water', name: 'Water Main Replacement',       cost: 2600000, category: 'Utilities',          icon: '🚰', tiles: 1 },
+  { id: 'p_solar', name: 'Solar on City Buildings',      cost: 1400000, category: 'Utilities',          icon: '☀️', tiles: 1 },
+  { id: 'p_fiber', name: 'Public Broadband Network',     cost: 1900000, category: 'Utilities',          icon: '📡', tiles: 1 },
+  { id: 'p_house', name: 'Affordable Housing Complex',   cost: 3500000, category: 'Housing',            icon: '🏢', tiles: 1 },
+  { id: 'p_arts',  name: 'Arts & Performance Center',    cost: 1700000, category: 'Culture',            icon: '🎭', tiles: 1 },
+  { id: 'p_biz',   name: 'Small Business Incubator',     cost: 1000000, category: 'Economy',            icon: '💼', tiles: 1 }
 ];
-const EMOJIS = ['🚌','🚲','🌉','🚦','🚆','🛣️','🚒','🚓','🚨','🌳','🏊','🛝','🏟️','📚','🏫','🏥','🚰','☀️','⚡','📡','♻️','🏢','🏡','🎭','🎨','💼','🛒','🏗️','🐕','🌷'];
+const EMOJIS = ['🚌','🚲','🛣️','🌉','🚦','🚆','🚒','🚓','🚨','🌳','🏊','🛝','🏟️','📚','🏫','🏥','🚰','☀️','⚡','📡','♻️','🏢','🏡','🎭','🎨','💼','🛒','🏗️','🐕','🌷'];
 
 /* ════════════════════════════════════════════════════════════════════════════
    UTILITIES
    ════════════════════════════════════════════════════════════════════════════ */
 const $  = (s, r = document) => r.querySelector(s);
-const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
 const fmt = n => (n < 0 ? '-$' : '$') + Math.round(Math.abs(n)).toLocaleString('en-US');
 const fmtShort = n => {
@@ -189,11 +185,13 @@ const fmtShort = n => {
 };
 const uid = () => Math.random().toString(36).slice(2, 9);
 const genCode = () => { const a = 'ABCDEFGHJKMNPQRSTUVWXYZ'; let c = ''; for (let i = 0; i < 4; i++) c += a[Math.floor(Math.random() * a.length)]; return c; };
+const cleanCode = s => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
 const slug = s => String(s).toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'table';
 const timeout = (p, ms) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), ms))]);
 const toArr = v => Array.isArray(v) ? v.filter(Boolean) : (v && typeof v === 'object') ? Object.keys(v).sort((a, b) => a - b).map(k => v[k]) : [];
 const hash = str => { let h = 5381; for (let i = 0; i < str.length; i++) h = ((h << 5) + h + str.charCodeAt(i)) | 0; return Math.abs(h); };
 const natSort = (a, b) => a.name.localeCompare(b.name, undefined, { numeric: true });
+const clone = o => JSON.parse(JSON.stringify(o));
 
 const mem = {};
 const store = {
@@ -202,24 +200,36 @@ const store = {
   del(k) { try { localStorage.removeItem(k); } catch { delete mem[k]; } }
 };
 
+/* URL routing: the table page lives at join.html (→ index.html?join) */
+const QS = new URLSearchParams(location.search);
+const JOIN_MODE = QS.has('join') || QS.has('code') || /join=/i.test(location.hash) || /join/i.test(location.pathname.split('/').pop() || '');
+const URL_CODE = cleanCode(QS.get('code') || QS.get('join') || (location.hash.match(/join=([A-Za-z0-9]+)/) || [])[1] || '');
+const joinPageURL = () => new URL('join.html', location.href).href;
+const joinDirectURL = code => location.origin + location.pathname + '?join&code=' + encodeURIComponent(code);
+
+function logoFail(img) {
+  const s = document.createElement('span');
+  s.className = 'wordmark text-slate-600 text-2xl'; s.textContent = 'Our City';
+  img.replaceWith(s);
+}
+const logoImg = (h = 48) => `<img src="${LOGO_SRC}" alt="Our City" class="block object-contain" style="height:${h}px;width:auto;max-width:100%" onerror="logoFail(this)">`;
+
 function iconHTML(icon) {
   const s = String(icon || '📦');
   if (/^(https?:\/\/|data:image\/)/i.test(s))
     return `<img class="ico-img" src="${esc(s)}" alt="" referrerpolicy="no-referrer" onerror="this.replaceWith(document.createTextNode('📦'))">`;
   return `<span>${esc(s)}</span>`;
 }
-
 function setHTML(el, html) { if (el && el._h !== html) { el._h = html; el.innerHTML = html; } }
 
 function toast(msg, kind = 'info') {
   const t = document.createElement('div');
   t.className = 'fixed left-1/2 -translate-x-1/2 bottom-6 z-[100] px-5 py-3 rounded-xl text-sm font-semibold shadow-2xl pop max-w-[92vw] text-center ' +
-    (kind === 'error' ? 'bg-rose-600 text-white' : 'bg-slate-900 text-white border border-white/10');
+    (kind === 'error' ? 'bg-rose-600 text-white' : 'bg-slate-900 text-white');
   t.textContent = msg;
   document.body.appendChild(t);
   setTimeout(() => t.remove(), 4200);
 }
-
 function loadScript(src) {
   return new Promise((res, rej) => {
     const s = document.createElement('script');
@@ -227,7 +237,10 @@ function loadScript(src) {
     document.head.appendChild(s);
   });
 }
-
+function copyText(text) {
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(() => toast('Link copied'), () => prompt('Copy this link:', text));
+  else prompt('Copy this link:', text);
+}
 function setMoney(el, val) {
   if (!el) return;
   if (el._v === undefined) { el._v = val; el.textContent = fmt(val); return; }
@@ -255,11 +268,9 @@ function beep(freq = 660, dur = .12, type = 'sine', vol = .08) {
     g.gain.exponentialRampToValueAtTime(.0001, actx.currentTime + dur); o.stop(actx.currentTime + dur);
   } catch {}
 }
-function chime(ok) {
-  (ok ? [523, 659, 784, 1046] : [330, 262]).forEach((f, i) => setTimeout(() => beep(f, .28, ok ? 'triangle' : 'sawtooth', ok ? .1 : .05), i * 130));
-}
+function chime(ok) { (ok ? [523, 659, 784, 1046] : [330, 262]).forEach((f, i) => setTimeout(() => beep(f, .28, ok ? 'triangle' : 'sawtooth', ok ? .1 : .05), i * 130)); }
 function confetti(n = 80) {
-  const colors = ['#34d399', '#38bdf8', '#fbbf24', '#f472b6', '#a78bfa', '#fb923c'];
+  const colors = ['#8dc63f', '#29abe2', '#f5a81c', '#c2377f', '#7b3f98', '#f7941d'];
   const box = document.createElement('div');
   box.className = 'fixed inset-0 pointer-events-none z-[90] overflow-hidden';
   for (let i = 0; i < n; i++) {
@@ -274,53 +285,12 @@ function confetti(n = 80) {
 }
 
 /* ════════════════════════════════════════════════════════════════════════════
-   SYNC TRANSPORTS  (same interface: set/get/on/now/onConnection/close)
+   FIREBASE TRANSPORT  (Realtime Database, rooms/<CODE>/…)
    ════════════════════════════════════════════════════════════════════════════ */
-const getIn = (o, path) => path.split('/').filter(Boolean).reduce((a, k) => (a == null ? a : a[k]), o);
-function setIn(o, path, val) {
-  const ks = path.split('/').filter(Boolean);
-  let cur = o;
-  for (let i = 0; i < ks.length - 1; i++) { if (cur[ks[i]] == null || typeof cur[ks[i]] !== 'object') cur[ks[i]] = {}; cur = cur[ks[i]]; }
-  if (val == null) delete cur[ks[ks.length - 1]]; else cur[ks[ks.length - 1]] = val;
-}
-
-/** Local demo transport: localStorage + BroadcastChannel (tabs in the same browser only). */
-class LocalTransport {
-  constructor(code) {
-    this.mode = 'local'; this.code = code; this.key = 'civic:room:' + code; this.listeners = [];
-    try { this.bc = new BroadcastChannel('civic:' + code); this.bc.onmessage = () => this._notify(); } catch {}
-    this._onStorage = e => { if (e.key === this.key) this._notify(); };
-    window.addEventListener('storage', this._onStorage);
-  }
-  _read() { return store.get(this.key, {}) || {}; }
-  now() { return Date.now(); }
-  set(path, val) {
-    const root = this._read(); setIn(root, path, val == null ? null : JSON.parse(JSON.stringify(val)));
-    store.set(this.key, root); this._notify(); try { this.bc && this.bc.postMessage(1); } catch {}
-    return Promise.resolve();
-  }
-  get(path) { const v = getIn(this._read(), path); return Promise.resolve(v === undefined ? null : v); }
-  on(path, cb) {
-    const l = { path, cb, last: undefined }; this.listeners.push(l);
-    setTimeout(() => this._notify(), 0);
-    return () => { this.listeners = this.listeners.filter(x => x !== l); };
-  }
-  _notify() {
-    const root = this._read();
-    this.listeners.slice().forEach(l => {
-      const v = getIn(root, l.path), val = v === undefined ? null : v, s = JSON.stringify(val);
-      if (s !== l.last) { l.last = s; l.cb(val); }
-    });
-  }
-  onConnection(cb) { cb(true); }
-  close() { try { this.bc && this.bc.close(); } catch {} window.removeEventListener('storage', this._onStorage); this.listeners = []; }
-}
-
-/** Firebase Realtime Database transport (compat SDK loaded on demand). */
 class FirebaseTransport {
-  constructor(code, cfg) {
-    this.mode = 'firebase'; this.code = code; this.offset = 0; this.connected = false; this.connCbs = [];
-    const app = firebase.apps.length ? firebase.app() : firebase.initializeApp(cfg);
+  constructor(code) {
+    this.code = code; this.offset = 0; this.connected = false; this.connCbs = [];
+    const app = firebase.apps.length ? firebase.app() : firebase.initializeApp({ databaseURL: FIREBASE_URL });
     this.db = firebase.database(app);
     this._offRef = this.db.ref('.info/serverTimeOffset'); this._offRef.on('value', s => { this.offset = s.val() || 0; });
     this._conRef = this.db.ref('.info/connected');
@@ -334,18 +304,12 @@ class FirebaseTransport {
   onConnection(cb) { this.connCbs.push(cb); cb(this.connected); }
   close() { this.connCbs = []; try { this._offRef.off(); this._conRef.off(); } catch {} }
 }
-
-const getFirebaseConfig = () => FIREBASE_CONFIG || store.get('civic:fb', null);
 async function createTransport(code) {
-  const cfg = getFirebaseConfig();
-  if (cfg && cfg.databaseURL) {
-    if (!(window.firebase && firebase.apps)) {
-      await loadScript('https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js');
-      await loadScript('https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js');
-    }
-    return new FirebaseTransport(code, cfg);
+  if (!(window.firebase && firebase.apps)) {
+    await loadScript('https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js');
+    await loadScript('https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js');
   }
-  return new LocalTransport(code);
+  return new FirebaseTransport(code);
 }
 
 /* ════════════════════════════════════════════════════════════════════════════
@@ -355,10 +319,16 @@ const remaining = s => s.startingBudget - s.spent;
 function normalizeState(s) {
   if (!s || typeof s !== 'object') return null;
   s.queue = toArr(s.queue); s.placed = toArr(s.placed); s.decisions = toArr(s.decisions);
-  s.spent = s.spent || 0; s.idx = s.idx || 0;
+  s.spent = s.spent || 0; s.idx = s.idx || 0; s.extraRows = s.extraRows || 0;
   return s;
 }
-const gridDims = s => ({ cols: COLS, rows: Math.max(5, Math.ceil((s.queue.length + (s.baseline ? 4 : 0)) / COLS)) });
+const builtItems = s => { const seen = new Map(); s.placed.filter(p => !p.base).forEach(p => { if (!seen.has(p.itemId)) seen.set(p.itemId, p); }); return [...seen.values()]; };
+function gridDims(s) {
+  const tiles = s.queue.reduce((a, q) => a + (q.tiles || 1), 0) + s.placed.filter(p => p.base).length;
+  const maxSlot = s.placed.reduce((m, p) => Math.max(m, p.slot == null ? -1 : p.slot), -1);
+  const rows = Math.max(5, Math.ceil(tiles / COLS), Math.ceil((maxSlot + 1) / COLS)) + (s.extraRows || 0);
+  return { cols: COLS, rows };
+}
 function baselineTiles(rows) {
   const m = Math.floor(rows / 2);
   return [
@@ -368,38 +338,29 @@ function baselineTiles(rows) {
     { r: m + 1, c: 5, name: 'Riverside Homes', icon: '🏘️', category: 'Housing' }
   ];
 }
-function fillOrder(code, rows, baseline) {
-  const base = new Set(baseline ? baselineTiles(rows).map(t => t.r * COLS + t.c) : []);
+/** Empty slots, nearest-to-centre first (used by Auto-place). */
+function freeSlots(s) {
+  const { rows } = gridDims(s), occ = new Set(s.placed.map(p => p.slot));
   const cr = (rows - 1) / 2, cc = (COLS - 1) / 2, arr = [];
   for (let r = 0; r < rows; r++) for (let c = 0; c < COLS; c++) {
-    const idx = r * COLS + c; if (base.has(idx)) continue;
-    arr.push([Math.hypot(r - cr, (c - cc) * .8) + (hash(code + ':' + idx) % 100) / 100 * .9, idx]);
+    const idx = r * COLS + c; if (occ.has(idx)) continue;
+    arr.push([Math.hypot(r - cr, (c - cc) * .8) + (hash(s.code + ':' + idx) % 100) / 100 * .9, idx]);
   }
   return arr.sort((a, b) => a[0] - b[0]).map(x => x[1]);
 }
 const cityTier = n => ['Hamlet', 'Village', 'Town', 'City', 'Metropolis'][Math.min(4, Math.floor(n / 3))];
+const advanceAfter = s => { s.pending = null; s.idx++; s.phase = s.idx >= s.queue.length ? 'finished' : 'idle'; };
 
 /* ════════════════════════════════════════════════════════════════════════════
    VIEW INFRASTRUCTURE
    ════════════════════════════════════════════════════════════════════════════ */
-/** Fan-of-leaves mark, drawn in the brand palette. */
-function logoMark(w = 64) {
-  const petals = [[-62, '#8dc63f', 44], [-42, '#f7941d', 50], [-22, '#29abe2', 56], [-4, '#c1272d', 58], [14, '#7b3f98', 56], [34, '#2aa198', 50], [54, '#f5a81c', 44]];
-  return `<svg width="${w}" height="${Math.round(w * .62)}" viewBox="0 0 120 74" aria-hidden="true" style="overflow:visible">
-    <path d="M4 64 Q60 40 116 64 Q60 54 4 64Z" fill="#8dc63f" opacity=".85"/>
-    ${petals.map(([a, c, l]) => `<path d="M0 0 C-8 -${l * .3} -6 -${l * .7} 0 -${l} C6 -${l * .7} 8 -${l * .3} 0 0Z" transform="translate(60 62) rotate(${a})" fill="${c}" opacity=".88" style="mix-blend-mode:multiply"/>`).join('')}
-  </svg>`;
-}
-
 const app = document.getElementById('app');
 let teardown = [];
 function cleanup() { teardown.forEach(f => { try { f(); } catch (e) { console.error(e); } }); teardown = []; }
-function splash(msg) {
-  return `<div class="min-h-screen bg-grid grid place-items-center"><div class="text-center"><div class="mb-4 flex justify-center animate-bounce">${logoMark(84)}</div><div class="text-slate-500 font-semibold">${esc(msg)}</div></div></div>`;
-}
+const splash = msg => `<div class="min-h-screen bg-grid grid place-items-center"><div class="text-center px-6"><div class="mb-5 flex justify-center animate-pulse">${logoImg(90)}</div><div class="text-slate-500 font-semibold">${esc(msg)}</div></div></div>`;
 function openModal(inner, cls = 'max-w-lg') {
   const m = document.createElement('div');
-  m.className = 'fixed inset-0 z-[80] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm fade-in';
+  m.className = 'fixed inset-0 z-[80] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm fade-in';
   m.innerHTML = `<div class="w-full ${cls} max-h-[92vh] overflow-auto rounded-3xl bg-white text-slate-900 shadow-2xl pop">${inner}</div>`;
   const close = () => m.remove();
   m.addEventListener('click', e => { if (e.target === m || e.target.closest('[data-close]')) close(); });
@@ -408,85 +369,72 @@ function openModal(inner, cls = 'max-w-lg') {
   m.close = close;
   return m;
 }
-const syncBadge = () => getFirebaseConfig()
-  ? `<span class="inline-flex items-center gap-2 text-xs font-semibold text-emerald-700"><span class="w-2 h-2 rounded-full bg-emerald-400"></span>Live sync (Firebase)</span>`
-  : `<span class="inline-flex items-center gap-2 text-xs font-semibold text-amber-600"><span class="w-2 h-2 rounded-full bg-amber-400"></span>Local demo mode</span>`;
+const syncBadge = () => `<span class="inline-flex items-center gap-2 text-xs font-semibold text-emerald-700"><span class="w-2 h-2 rounded-full bg-emerald-400"></span>Live sync</span>`;
+function showLanding(notice) { return JOIN_MODE ? showJoinPage(notice) : showHostLanding(notice); }
 
 /* ════════════════════════════════════════════════════════════════════════════
-   LANDING
+   HOST LANDING  (index.html)
    ════════════════════════════════════════════════════════════════════════════ */
-function openSyncModal() {
-  const cfg = getFirebaseConfig();
-  const m = openModal(`
-    <div class="p-6 md:p-8">
-      <div class="flex items-start justify-between gap-4">
-        <div><h2 class="font-display text-2xl font-bold">Sync settings</h2>
-        <p class="text-sm text-slate-500 mt-1">Connect a free Firebase Realtime Database so phones, tablets and laptops can join the same room.</p></div>
-        <button data-close class="btn btn-light !px-3 !py-1.5">✕</button>
-      </div>
-      <ol class="mt-5 space-y-2 text-sm text-slate-700 list-decimal pl-5">
-        <li>Create a project at <b>console.firebase.google.com</b> (no billing needed).</li>
-        <li>Open <b>Build → Realtime Database → Create database</b>.</li>
-        <li>On the <b>Rules</b> tab paste the rules below and publish.</li>
-        <li>Copy the database URL from the <b>Data</b> tab and paste it here. Do this on each device, or hard-code it in <code class="bg-slate-100 px-1 rounded">FIREBASE_CONFIG</code> in the file.</li>
-      </ol>
-      <pre class="mt-4 text-xs bg-slate-900 text-emerald-300 rounded-xl p-4 overflow-auto">{
-  "rules": {
-    "rooms": {
-      "$room": { ".read": true, ".write": true }
-    }
-  }
-}</pre>
-      <p class="text-xs text-slate-500 mt-2">These rules are open, which suits a live event. Delete the database (or change the rules) afterwards.</p>
-      <label class="lbl mt-5" for="fbUrl">Realtime Database URL</label>
-      <input id="fbUrl" class="field" placeholder="https://your-project-default-rtdb.firebaseio.com" value="${esc(cfg?.databaseURL || '')}">
-      <div class="flex gap-3 mt-5">
-        <button id="fbSave" class="btn btn-green flex-1">Save &amp; use live sync</button>
-        <button id="fbClear" class="btn btn-light">Use local demo</button>
-      </div>
-    </div>`, 'max-w-xl');
-  $('#fbSave', m).onclick = () => {
-    const url = $('#fbUrl', m).value.trim().replace(/\/+$/, '');
-    if (!/^https:\/\/.+\.(firebaseio\.com|firebasedatabase\.app)$/i.test(url)) { toast('Enter a valid Firebase Realtime Database URL', 'error'); return; }
-    store.set('civic:fb', { databaseURL: url }); m.close(); toast('Live sync enabled'); showLanding();
-  };
-  $('#fbClear', m).onclick = () => { store.del('civic:fb'); m.close(); toast('Switched to local demo mode'); showLanding(); };
-}
-
-function showLanding(notice) {
+function showHostLanding(notice) {
   cleanup();
   const lastHost = store.get('civic:lastHost', null);
-  const lastTable = store.get('civic:lastTable', { code: '', name: '' });
-  const hashCode = ((location.hash.match(/join=([A-Za-z0-9]+)/) || [])[1] || '').toUpperCase();
+  const link = joinPageURL();
   app.innerHTML = `
   <div class="min-h-screen bg-grid flex flex-col">
-    <header class="px-5 md:px-8 pt-5 flex items-center justify-end">
-      <button data-act="sync" class="btn btn-ghost !py-2 text-sm">${syncBadge()} <span class="text-slate-500">⚙</span></button>
-    </header>
-    <div class="text-center px-4 pt-1 md:pt-2">
-      <div class="flex justify-center">${logoMark(150)}</div>
-      <h1 class="wordmark text-4xl md:text-6xl text-slate-600 mt-4">Our City</h1>
-      <div class="flex items-center justify-center gap-4 mt-3 text-slate-500"><span class="h-px w-10 bg-slate-300"></span><span class="wordmark text-xs md:text-sm">Budget it together</span><span class="h-px w-10 bg-slate-300"></span></div>
-    </div>
-    ${notice ? `<div class="mx-auto w-full max-w-5xl px-4"><div class="rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-sm px-4 py-3 pop">${esc(notice)}</div></div>` : ''}
-    <main class="flex-1 grid place-items-center px-4 py-8">
-      <div class="w-full max-w-5xl grid md:grid-cols-2 gap-6">
+    <header class="px-5 md:px-8 pt-5 flex justify-end">${syncBadge()}</header>
+    <main class="flex-1 grid place-items-center px-4 py-6">
+      <div class="w-full max-w-xl">
+        <div class="flex justify-center">${logoImg(130)}</div>
+        ${notice ? `<div class="mt-6 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-sm px-4 py-3 pop">${esc(notice)}</div>` : ''}
+        <h1 class="wordmark text-3xl md:text-5xl text-slate-600 text-center mt-8 mb-5">Build a New City</h1>
         <section class="panel p-7 md:p-9 flex flex-col">
           <div class="text-4xl mb-4">📽️</div>
           <h2 class="font-display text-2xl md:text-3xl font-semibold text-white leading-tight">Run the presentation</h2>
-          <p class="text-slate-300 mt-3 leading-relaxed">Project this screen. Set the budget and the project queue, then put each item to a live vote and watch the city fill in.</p>
-          <div class="mt-auto pt-8 space-y-3">
+          <p class="text-slate-300 mt-3 leading-relaxed">Project this screen. Set the budget and the project queue, then put each item to a live vote and place what passes onto the city grid.</p>
+          <div class="pt-7 space-y-3">
             <button data-act="host" class="btn btn-green w-full !text-lg !py-4">Launch host screen</button>
             ${lastHost ? `<button data-act="resume" class="btn btn-ghost w-full">Resume room <span class="num font-bold tracking-widest">${esc(lastHost)}</span></button>` : ''}
           </div>
         </section>
-        <section class="card p-7 md:p-9 flex flex-col">
-          <div class="text-4xl mb-4">🗳️</div>
-          <h2 class="font-display text-2xl md:text-3xl font-semibold leading-tight">Vote from a table</h2>
-          <p class="text-slate-500 mt-3 leading-relaxed">Enter the room code shown on the main screen and name your table. One vote per table, per item.</p>
+        <section class="card p-5 mt-5">
+          <div class="text-xs font-semibold text-slate-500">Table join link · share this with the tables</div>
+          <div class="flex items-center gap-2 mt-2">
+            <div class="flex-1 min-w-0 rounded-xl bg-slate-50 border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 truncate">${esc(link)}</div>
+            <button data-act="copy" class="btn btn-light !py-2">Copy</button>
+            <a href="${esc(link)}" target="_blank" rel="noopener" class="btn btn-light !py-2">Open</a>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>`;
+  const onClick = e => {
+    const b = e.target.closest('[data-act]'); if (!b) return;
+    if (b.dataset.act === 'host') showSetup();
+    else if (b.dataset.act === 'resume') showHost(lastHost, null, false);
+    else if (b.dataset.act === 'copy') copyText(link);
+  };
+  app.addEventListener('click', onClick);
+  teardown.push(() => app.removeEventListener('click', onClick));
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   TABLE JOIN PAGE  (join.html)
+   ════════════════════════════════════════════════════════════════════════════ */
+function showJoinPage(notice) {
+  cleanup();
+  const lastTable = store.get('civic:lastTable', { code: '', name: '' });
+  app.innerHTML = `
+  <div class="min-h-screen bg-grid flex flex-col">
+    <main class="flex-1 grid place-items-center px-4 py-8">
+      <div class="w-full max-w-md">
+        <div class="flex justify-center">${logoImg(110)}</div>
+        ${notice ? `<div class="mt-6 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-sm px-4 py-3 pop">${esc(notice)}</div>` : ''}
+        <section class="card p-7 mt-7">
+          <h1 class="font-display text-2xl md:text-3xl font-semibold leading-tight">Join your table</h1>
+          <p class="text-slate-500 mt-2 leading-relaxed">Enter the room code from the main screen and name your table. Each table gets one vote per item.</p>
           <div class="mt-6 space-y-4">
             <div><label class="lbl" for="jCode">Room code</label>
-              <input id="jCode" class="field num !text-2xl !font-bold tracking-[.35em] uppercase text-center" maxlength="6" autocomplete="off" autocapitalize="characters" placeholder="ABCD" value="${esc(hashCode || lastTable.code)}"></div>
+              <input id="jCode" class="field num !text-3xl !font-bold tracking-[.35em] uppercase text-center" maxlength="6" autocomplete="off" autocapitalize="characters" placeholder="ABCD" value="${esc(URL_CODE || lastTable.code)}"></div>
             <div><label class="lbl" for="jName">Table name</label>
               <input id="jName" class="field" maxlength="24" placeholder="Table 1" value="${esc(lastTable.name)}"></div>
           </div>
@@ -494,27 +442,20 @@ function showLanding(notice) {
         </section>
       </div>
     </main>
-    <footer class="text-center text-xs text-slate-500 pb-6 px-4">
-      ${getFirebaseConfig() ? 'Live sync is on: any device with the room code can join.' : 'Local demo mode: table screens only work in other tabs of this same browser. Open ⚙ to connect live sync for real devices.'}
-    </footer>
+    <footer class="text-center text-xs text-slate-500 pb-6">${syncBadge()}</footer>
   </div>`;
-
-  const onClick = e => {
-    const b = e.target.closest('[data-act]'); if (!b) return;
-    const a = b.dataset.act;
-    if (a === 'sync') openSyncModal();
-    else if (a === 'host') showSetup();
-    else if (a === 'resume') showHost(lastHost, null, false);
-    else if (a === 'join') {
-      const code = $('#jCode').value.trim().toUpperCase(), name = $('#jName').value.trim();
-      if (code.length < 3) { toast('Enter the room code from the main screen', 'error'); return; }
-      if (!name) { toast('Give your table a name, like "Table 2"', 'error'); return; }
-      showTable(code, name);
-    }
+  $('#jCode').oninput = e => { e.target.value = cleanCode(e.target.value); };
+  const join = () => {
+    const code = cleanCode($('#jCode').value), name = $('#jName').value.trim();
+    if (code.length < 3) { toast('Enter the room code from the main screen', 'error'); return; }
+    if (!name) { toast('Give your table a name, like "Table 2"', 'error'); return; }
+    showTable(code, name);
   };
-  app.addEventListener('click', onClick);
-  teardown.push(() => app.removeEventListener('click', onClick));
-  if (hashCode && !lastTable.name) setTimeout(() => $('#jName')?.focus(), 50);
+  const onClick = e => { if (e.target.closest('[data-act="join"]')) join(); };
+  const onKey = e => { if (e.key === 'Enter' && /INPUT/.test(e.target.tagName)) join(); };
+  app.addEventListener('click', onClick); document.addEventListener('keydown', onKey);
+  teardown.push(() => { app.removeEventListener('click', onClick); document.removeEventListener('keydown', onKey); });
+  if (URL_CODE && !lastTable.name) setTimeout(() => $('#jName')?.focus(), 50);
 }
 
 /* ════════════════════════════════════════════════════════════════════════════
@@ -522,75 +463,85 @@ function showLanding(notice) {
    ════════════════════════════════════════════════════════════════════════════ */
 function showSetup() {
   cleanup();
-  const saved = store.get('civic:draft', null);
-  const draft = saved || {
-    title: 'Our City', budget: 15000000, duration: 30, baseline: true, autoEnd: false, autoContinue: 10,
-    queue: PRESETS.filter(p => p.def).map(p => ({ id: p.id, name: p.name, cost: p.cost, category: p.category, icon: p.icon }))
-  };
-  const code = genCode();
-  let editingId = null;
-  const save = () => store.set('civic:draft', draft);
+  const draft = Object.assign(
+    { code: '', title: 'Our City', budget: 15000000, duration: 30, baseline: true, autoEnd: false, queue: [] },
+    store.get(KEY_DRAFT, {})
+  );
+  draft.queue = toArr(draft.queue);
+  if (!cleanCode(draft.code)) draft.code = genCode();
+  let library = store.get(KEY_LIB, null);
+  if (!Array.isArray(library)) library = clone(PRESETS);
+  let edit = null; // { type: 'lib' | 'queue', id }
+  const save = () => store.set(KEY_DRAFT, draft);
+  const saveLib = () => store.set(KEY_LIB, library);
+  save();
+
+  const tilesChip = n => n > 1 ? `<span class="chip bg-slate-100 text-slate-600 !text-[.65rem]">${n} tiles</span>` : '';
 
   app.innerHTML = `
   <div class="min-h-screen bg-grid">
     <header class="sticky top-0 z-30 bg-white/95 backdrop-blur border-b border-slate-200">
       <div class="max-w-7xl mx-auto px-4 md:px-6 h-16 flex items-center justify-between gap-3">
-        <div class="flex items-center gap-3">
+        <div class="flex items-center gap-4">
           <button data-act="back" class="btn btn-ghost !py-2 !px-3">← Back</button>
-          <div class="wordmark text-slate-600 text-base hidden sm:block">Host setup</div>
+          <div class="hidden sm:block">${logoImg(40)}</div>
         </div>
         <div class="flex items-center gap-4"><span class="hidden md:block">${syncBadge()}</span>
-          <button data-act="launch" id="sLaunch" class="btn btn-green !py-2.5">Launch presentation</button></div>
+          <button data-act="launch" class="btn btn-green !py-2.5">Launch presentation</button></div>
       </div>
     </header>
     <main class="max-w-7xl mx-auto p-4 md:p-6 grid lg:grid-cols-12 gap-6">
       <section class="lg:col-span-5 space-y-6">
         <div class="card p-6">
-          <h2 class="font-display text-xl font-bold mb-4">Session</h2>
+          <h2 class="font-display text-xl font-semibold mb-4">Session</h2>
           <div class="space-y-4">
             <div><label class="lbl" for="sTitle">Name your city</label>
               <input id="sTitle" class="field !text-xl !font-semibold" maxlength="32" placeholder="e.g. Garden City" value="${esc(draft.title)}">
               <p class="text-xs text-slate-500 mt-1.5">Shown on the big screen, on every table, and in the final summary. You can rename it during the session.</p></div>
+            <div><label class="lbl" for="sCode">Room code</label>
+              <div class="flex gap-2"><input id="sCode" class="field num !text-2xl !font-bold tracking-[.3em] uppercase" maxlength="6" autocapitalize="characters" value="${esc(draft.code)}">
+              <button data-act="shuffle" class="btn btn-light shrink-0">Shuffle</button></div>
+              <p class="text-xs text-slate-500 mt-1.5">3 to 6 letters or numbers. Tables type this in to join.</p></div>
             <div><label class="lbl" for="sBudget">Starting budget</label>
               <input id="sBudget" class="field num !text-xl !font-bold" inputmode="numeric" value="${esc(fmt(draft.budget))}">
               <div class="flex flex-wrap gap-2 mt-2">${[5e6, 10e6, 15e6, 25e6, 50e6].map(v => `<button data-act="bud" data-v="${v}" class="chip bg-slate-100 text-slate-700 hover:bg-emerald-100 cursor-pointer">${fmtShort(v)}</button>`).join('')}</div></div>
-            <div class="grid grid-cols-2 gap-3">
-              <div><label class="lbl" for="sDur">Vote timer</label>
-                <select id="sDur" class="field">${[15, 20, 30, 45, 60, 90].map(v => `<option value="${v}" ${draft.duration === v ? 'selected' : ''}>${v} seconds</option>`).join('')}</select></div>
-              <div><label class="lbl" for="sAuto">Auto-continue after result</label>
-                <select id="sAuto" class="field">${[[0, 'Off (manual)'], [6, '6 seconds'], [10, '10 seconds'], [15, '15 seconds']].map(([v, l]) => `<option value="${v}" ${draft.autoContinue === v ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
-            </div>
-            <label class="flex items-center gap-3 text-sm font-medium cursor-pointer"><input id="sBase" type="checkbox" class="w-5 h-5 accent-emerald-500" ${draft.baseline ? 'checked' : ''}> Start the city with existing zones (City Hall, homes, Main Street)</label>
-            <label class="flex items-center gap-3 text-sm font-medium cursor-pointer"><input id="sEnd" type="checkbox" class="w-5 h-5 accent-emerald-500" ${draft.autoEnd ? 'checked' : ''}> End a vote early once every connected table has voted</label>
+            <div><label class="lbl" for="sDur">Vote timer</label>
+              <select id="sDur" class="field">${[15, 20, 30, 45, 60, 90].map(v => `<option value="${v}" ${draft.duration === v ? 'selected' : ''}>${v} seconds</option>`).join('')}</select></div>
+            <label class="flex items-center gap-3 text-sm font-medium cursor-pointer"><input id="sBase" type="checkbox" class="w-5 h-5 accent-emerald-600" ${draft.baseline ? 'checked' : ''}> Start the city with existing zones (City Hall, homes, Main Street)</label>
+            <label class="flex items-center gap-3 text-sm font-medium cursor-pointer"><input id="sEnd" type="checkbox" class="w-5 h-5 accent-emerald-600" ${draft.autoEnd ? 'checked' : ''}> End a vote early once every connected table has voted</label>
           </div>
         </div>
         <div class="card p-6">
-          <div class="flex items-center justify-between mb-3"><h2 class="font-display text-xl font-bold">Project library</h2><span class="text-xs text-slate-500">Tap to add to the queue</span></div>
-          <div id="sLib" class="space-y-2 max-h-[420px] overflow-auto pr-1"></div>
+          <div class="flex items-center justify-between mb-3"><h2 class="font-display text-xl font-semibold">Project library</h2><button data-act="restore" class="btn btn-light !py-1.5 text-sm">Restore defaults</button></div>
+          <p class="text-xs text-slate-500 mb-3">Your library is saved in this browser. Add projects to the queue, edit them, or remove them.</p>
+          <div id="sLib" class="space-y-2 max-h-[460px] overflow-auto pr-1"></div>
         </div>
       </section>
 
       <section class="lg:col-span-7 space-y-6">
         <div class="card p-6">
           <div class="flex items-start justify-between gap-3 mb-1">
-            <div><h2 class="font-display text-xl font-bold">Vote queue</h2><div id="sSummary" class="text-sm text-slate-500 mt-1"></div></div>
-            <div class="flex gap-2"><button data-act="defaults" class="btn btn-light !py-1.5 text-sm">Reset</button><button data-act="clear" class="btn btn-light !py-1.5 text-sm">Clear</button></div>
+            <div><h2 class="font-display text-xl font-semibold">Vote queue</h2><div id="sSummary" class="text-sm text-slate-500 mt-1"></div></div>
+            <button data-act="clear" class="btn btn-light !py-1.5 text-sm">Clear queue</button>
           </div>
           <div id="sBudBar" class="h-2.5 rounded-full bg-slate-100 overflow-hidden my-3"><div class="h-full bg-emerald-500 transition-all" style="width:0%"></div></div>
           <ul id="sQueue" class="space-y-2 max-h-[460px] overflow-auto pr-1"></ul>
         </div>
-        <div class="card p-6">
-          <h2 class="font-display text-xl font-bold mb-4" id="fTitle">Add a custom project</h2>
+        <div class="card p-6" id="fCard">
+          <h2 class="font-display text-xl font-semibold mb-4" id="fTitle">Create a project</h2>
           <div class="grid sm:grid-cols-2 gap-4">
             <div><label class="lbl" for="fName">Name</label><input id="fName" class="field" maxlength="40" placeholder="e.g. Skate Park"></div>
             <div><label class="lbl" for="fCost">Cost (USD)</label><input id="fCost" class="field num" type="number" min="0" step="50000" placeholder="1500000"></div>
             <div><label class="lbl" for="fCat">Category</label><select id="fCat" class="field">${Object.keys(CATS).map(c => `<option>${esc(c)}</option>`).join('')}</select></div>
-            <div><label class="lbl" for="fIcon">Icon: emoji or image URL</label>
+            <div><label class="lbl" for="fTiles">Grid tiles</label><input id="fTiles" class="field num" type="number" min="1" max="12" value="1">
+              <p class="text-xs text-slate-500 mt-1">Use more than 1 for things like roads. The host places each tile.</p></div>
+            <div class="sm:col-span-2"><label class="lbl" for="fIcon">Icon: emoji or image URL</label>
               <div class="flex gap-2 items-center"><input id="fIcon" class="field" placeholder="🛹 or https://…/image.png"><div id="fPrev" class="w-12 h-12 shrink-0 rounded-xl bg-slate-100 grid place-items-center text-3xl"></div></div></div>
           </div>
-          <div class="flex flex-wrap gap-1.5 mt-3" id="fEmojis">${EMOJIS.map(e => `<button type="button" data-act="emo" data-e="${e}" class="w-9 h-9 rounded-lg bg-slate-100 hover:bg-emerald-100 text-xl">${e}</button>`).join('')}</div>
+          <div class="flex flex-wrap gap-1.5 mt-3">${EMOJIS.map(e => `<button type="button" data-act="emo" data-e="${e}" class="w-9 h-9 rounded-lg bg-slate-100 hover:bg-emerald-100 text-xl">${e}</button>`).join('')}</div>
+          <label id="fQueueRow" class="flex items-center gap-3 text-sm font-medium cursor-pointer mt-4"><input id="fQueue" type="checkbox" class="w-5 h-5 accent-emerald-600" checked> Also add to the vote queue</label>
           <div class="flex gap-3 mt-5">
-            <button data-act="addItem" id="fSubmit" class="btn btn-dark">Add to queue</button>
+            <button data-act="saveItem" id="fSubmit" class="btn btn-dark">Save to library</button>
             <button data-act="cancelEdit" id="fCancel" class="btn btn-light hidden">Cancel edit</button>
           </div>
         </div>
@@ -598,88 +549,114 @@ function showSetup() {
     </main>
   </div>`;
 
-  /* --- dynamic regions --- */
   function renderLib() {
     const inQ = new Set(draft.queue.map(q => q.id));
-    setHTML($('#sLib'), PRESETS.map(p => `
+    setHTML($('#sLib'), library.length ? library.map(p => `
       <div class="flex items-center gap-3 p-2.5 rounded-xl border border-slate-200">
         <div class="w-10 h-10 rounded-xl grid place-items-center text-2xl shrink-0" style="background:${catColor(p.category)}26">${iconHTML(p.icon)}</div>
-        <div class="min-w-0 flex-1"><div class="font-semibold text-sm truncate">${esc(p.name)}</div><div class="text-xs text-slate-500">${esc(p.category)} · <b class="num">${fmt(p.cost)}</b></div></div>
-        ${inQ.has(p.id) ? '<span class="text-xs font-bold text-emerald-600">✓ Added</span>' : `<button data-act="libAdd" data-id="${p.id}" class="btn btn-light !py-1.5 !px-3 text-sm">+ Add</button>`}
-      </div>`).join(''));
+        <div class="min-w-0 flex-1"><div class="font-semibold text-sm truncate">${esc(p.name)}</div><div class="text-xs text-slate-500 flex items-center gap-1.5 flex-wrap">${esc(p.category)} · <b class="num">${fmt(p.cost)}</b> ${tilesChip(p.tiles)}</div></div>
+        <div class="flex gap-1 items-center">
+          ${inQ.has(p.id) ? '<span class="text-xs font-bold text-emerald-700 px-1">✓ Queued</span>' : `<button data-act="libAdd" data-id="${p.id}" class="btn btn-light !py-1.5 !px-3 text-sm">+ Queue</button>`}
+          <button data-act="libEdit" data-id="${p.id}" class="btn btn-light !p-1.5 !w-8" aria-label="Edit">✎</button>
+          <button data-act="libDel" data-id="${p.id}" class="btn btn-light !p-1.5 !w-8 !text-rose-600" aria-label="Delete from library">✕</button>
+        </div>
+      </div>`).join('') : '<div class="text-center text-slate-500 text-sm py-8">Your library is empty. Create a project below, or restore the defaults.</div>');
   }
   function renderQueue() {
     const total = draft.queue.reduce((a, q) => a + (+q.cost || 0), 0);
     const pct = draft.budget ? Math.round(total / draft.budget * 100) : 0;
-    $('#sSummary').innerHTML = `${draft.queue.length} projects · <b class="num">${fmt(total)}</b> requested · ${pct}% of budget`;
+    $('#sSummary').innerHTML = `${draft.queue.length} ${draft.queue.length === 1 ? 'project' : 'projects'} · <b class="num">${fmt(total)}</b> requested · ${pct}% of budget`;
     const bar = $('#sBudBar > div'); bar.style.width = Math.min(100, pct) + '%'; bar.className = 'h-full transition-all ' + (pct > 100 ? 'bg-amber-500' : 'bg-emerald-500');
     setHTML($('#sQueue'), draft.queue.length ? draft.queue.map((q, i) => `
       <li class="flex items-center gap-3 p-2.5 rounded-xl border border-slate-200 bg-white">
         <span class="w-6 text-center text-xs font-bold text-slate-400 num">${i + 1}</span>
         <div class="w-11 h-11 rounded-xl grid place-items-center text-2xl shrink-0" style="background:${catColor(q.category)}26">${iconHTML(q.icon)}</div>
-        <div class="min-w-0 flex-1"><div class="font-semibold truncate">${esc(q.name)}</div><div class="text-xs text-slate-500">${esc(q.category)} · <b class="num">${fmt(q.cost)}</b></div></div>
+        <div class="min-w-0 flex-1"><div class="font-semibold truncate">${esc(q.name)}</div><div class="text-xs text-slate-500 flex items-center gap-1.5 flex-wrap">${esc(q.category)} · <b class="num">${fmt(q.cost)}</b> ${tilesChip(q.tiles)}</div></div>
         <div class="flex gap-1">
           <button data-act="up" data-i="${i}" class="btn btn-light !p-1.5 !w-8" ${i === 0 ? 'disabled' : ''} aria-label="Move up">↑</button>
           <button data-act="down" data-i="${i}" class="btn btn-light !p-1.5 !w-8" ${i === draft.queue.length - 1 ? 'disabled' : ''} aria-label="Move down">↓</button>
-          <button data-act="edit" data-i="${i}" class="btn btn-light !p-1.5 !w-8" aria-label="Edit">✎</button>
-          <button data-act="del" data-i="${i}" class="btn btn-light !p-1.5 !w-8 !text-rose-600" aria-label="Remove">✕</button>
+          <button data-act="qEdit" data-i="${i}" class="btn btn-light !p-1.5 !w-8" aria-label="Edit">✎</button>
+          <button data-act="del" data-i="${i}" class="btn btn-light !p-1.5 !w-8 !text-rose-600" aria-label="Remove from queue">✕</button>
         </div>
-      </li>`).join('') : `<li class="text-center text-slate-500 py-10">The queue is empty. Add projects from the library or create your own.</li>`);
+      </li>`).join('') : `<li class="text-center text-slate-500 py-10">The queue is empty. Use “+ Queue” in the library, or create a project below.</li>`);
   }
-  function renderPrev() { $('#fPrev').innerHTML = iconHTML($('#fIcon').value.trim() || CATS[$('#fCat').value].icon); }
+  const renderPrev = () => { $('#fPrev').innerHTML = iconHTML($('#fIcon').value.trim() || CATS[$('#fCat').value].icon); };
   function resetForm() {
-    editingId = null; $('#fName').value = ''; $('#fCost').value = ''; $('#fIcon').value = ''; $('#fCat').selectedIndex = 0;
-    $('#fTitle').textContent = 'Add a custom project'; $('#fSubmit').textContent = 'Add to queue'; $('#fCancel').classList.add('hidden'); renderPrev();
+    edit = null; $('#fName').value = ''; $('#fCost').value = ''; $('#fIcon').value = ''; $('#fTiles').value = 1; $('#fCat').selectedIndex = 0;
+    $('#fTitle').textContent = 'Create a project'; $('#fSubmit').textContent = 'Save to library';
+    $('#fCancel').classList.add('hidden'); $('#fQueueRow').classList.remove('hidden'); renderPrev();
+  }
+  function loadForm(item, type) {
+    edit = { type, id: item.id };
+    $('#fName').value = item.name; $('#fCost').value = item.cost; $('#fCat').value = item.category; $('#fIcon').value = item.icon || ''; $('#fTiles').value = item.tiles || 1;
+    $('#fTitle').textContent = type === 'lib' ? 'Edit library project' : 'Edit queued project';
+    $('#fSubmit').textContent = 'Save changes'; $('#fCancel').classList.remove('hidden'); $('#fQueueRow').classList.add('hidden'); renderPrev();
+    $('#fCard').scrollIntoView({ behavior: 'smooth', block: 'center' }); $('#fName').focus();
   }
   renderLib(); renderQueue(); renderPrev();
 
-  /* --- inputs --- */
   $('#sTitle').oninput = e => { draft.title = e.target.value; save(); };
+  $('#sCode').oninput = e => { e.target.value = cleanCode(e.target.value); draft.code = e.target.value; save(); };
   $('#sBudget').oninput = e => { draft.budget = parseInt(e.target.value.replace(/\D/g, ''), 10) || 0; save(); renderQueue(); };
   $('#sBudget').onblur = e => { e.target.value = fmt(draft.budget); };
   $('#sDur').onchange = e => { draft.duration = +e.target.value; save(); };
-  $('#sAuto').onchange = e => { draft.autoContinue = +e.target.value; save(); };
   $('#sBase').onchange = e => { draft.baseline = e.target.checked; save(); };
   $('#sEnd').onchange = e => { draft.autoEnd = e.target.checked; save(); };
   $('#fIcon').oninput = renderPrev; $('#fCat').onchange = renderPrev;
 
+  const fromLib = p => ({ id: p.id, name: p.name, cost: +p.cost, category: p.category, icon: p.icon || '📦', tiles: +p.tiles || 1 });
   const onClick = e => {
     const b = e.target.closest('[data-act]'); if (!b) return;
-    const a = b.dataset.act, i = +b.dataset.i;
+    const a = b.dataset.act, i = +b.dataset.i, id = b.dataset.id;
     switch (a) {
       case 'back': showLanding(); return;
+      case 'shuffle': draft.code = genCode(); $('#sCode').value = draft.code; break;
       case 'bud': draft.budget = +b.dataset.v; $('#sBudget').value = fmt(draft.budget); break;
-      case 'libAdd': { const p = PRESETS.find(x => x.id === b.dataset.id); draft.queue.push({ id: p.id, name: p.name, cost: p.cost, category: p.category, icon: p.icon }); break; }
+      case 'libAdd': { const p = library.find(x => x.id === id); if (p && !draft.queue.some(q => q.id === id)) draft.queue.push(fromLib(p)); break; }
+      case 'libEdit': { const p = library.find(x => x.id === id); if (p) loadForm(p, 'lib'); return; }
+      case 'libDel': { const p = library.find(x => x.id === id); if (p && confirm(`Remove “${p.name}” from your library?`)) { library = library.filter(x => x.id !== id); saveLib(); } break; }
+      case 'restore': if (confirm('Replace your library with the default projects? Custom projects will be removed.')) { library = clone(PRESETS); saveLib(); } break;
       case 'up': [draft.queue[i - 1], draft.queue[i]] = [draft.queue[i], draft.queue[i - 1]]; break;
       case 'down': [draft.queue[i + 1], draft.queue[i]] = [draft.queue[i], draft.queue[i + 1]]; break;
       case 'del': draft.queue.splice(i, 1); break;
       case 'clear': if (draft.queue.length && confirm('Remove every project from the queue?')) draft.queue = []; break;
-      case 'defaults': if (confirm('Reset the queue to the default projects?')) draft.queue = PRESETS.filter(p => p.def).map(p => ({ id: p.id, name: p.name, cost: p.cost, category: p.category, icon: p.icon })); break;
-      case 'edit': {
-        const q = draft.queue[i]; editingId = q.id;
-        $('#fName').value = q.name; $('#fCost').value = q.cost; $('#fCat').value = q.category; $('#fIcon').value = q.icon || '';
-        $('#fTitle').textContent = 'Edit project'; $('#fSubmit').textContent = 'Save changes'; $('#fCancel').classList.remove('hidden'); renderPrev();
-        $('#fName').scrollIntoView({ behavior: 'smooth', block: 'center' }); $('#fName').focus(); return;
-      }
+      case 'qEdit': loadForm(draft.queue[i], 'queue'); return;
       case 'cancelEdit': resetForm(); return;
       case 'emo': $('#fIcon').value = b.dataset.e; renderPrev(); return;
-      case 'addItem': {
-        const name = $('#fName').value.trim(), cost = Math.round(+$('#fCost').value);
+      case 'saveItem': {
+        const name = $('#fName').value.trim(), cost = Math.round(+$('#fCost').value), tiles = Math.max(1, Math.min(12, Math.round(+$('#fTiles').value) || 1));
         if (!name) { toast('Give the project a name', 'error'); $('#fName').focus(); return; }
         if (!(cost > 0)) { toast('Enter a cost above $0', 'error'); $('#fCost').focus(); return; }
-        const item = { id: editingId || uid(), name, cost, category: $('#fCat').value, icon: $('#fIcon').value.trim() || CATS[$('#fCat').value].icon };
-        if (editingId) { const k = draft.queue.findIndex(q => q.id === editingId); if (k >= 0) draft.queue[k] = item; } else draft.queue.push(item);
+        const cat = $('#fCat').value, icon = $('#fIcon').value.trim() || CATS[cat].icon;
+        if (edit && edit.type === 'lib') {
+          const item = { id: edit.id, name, cost, category: cat, icon, tiles };
+          const k = library.findIndex(x => x.id === edit.id); if (k >= 0) library[k] = item;
+          draft.queue = draft.queue.map(q => q.id === edit.id ? { ...item } : q);
+          saveLib(); toast('Library updated');
+        } else if (edit && edit.type === 'queue') {
+          const k = draft.queue.findIndex(q => q.id === edit.id); if (k >= 0) draft.queue[k] = { id: edit.id, name, cost, category: cat, icon, tiles };
+        } else {
+          const item = { id: uid(), name, cost, category: cat, icon, tiles };
+          library.push(item); saveLib();
+          if ($('#fQueue').checked) draft.queue.push({ ...item });
+          toast('Saved to your library');
+        }
         resetForm(); break;
       }
       case 'launch': {
+        const code = cleanCode($('#sCode').value);
+        if (code.length < 3) { toast('Room code needs 3 to 6 letters or numbers', 'error'); $('#sCode').focus(); return; }
         if (!(draft.budget > 0)) { toast('Set a starting budget above $0', 'error'); return; }
-        if (!draft.queue.length) { toast('Add at least one project to the queue', 'error'); return; }
-        save();
+        if (!draft.queue.length) { toast('Add at least one project to the vote queue', 'error'); return; }
+        draft.code = code; save();
+        const queue = draft.queue.map(fromLib);
+        const tmp = { queue, placed: draft.baseline ? [0, 0, 0, 0].map(() => ({ base: true })) : [], extraRows: 0 };
+        const rows = gridDims(tmp).rows;
+        const placed = draft.baseline ? baselineTiles(rows).map((t, n) => ({ pid: 'base' + n, base: true, name: t.name, icon: t.icon, category: t.category, slot: t.r * COLS + t.c })) : [];
         showHost(code, {
-          v: 1, code, title: (draft.title || '').trim() || 'Our City', startingBudget: draft.budget, spent: 0, baseline: !!draft.baseline,
-          autoEnd: !!draft.autoEnd, autoContinue: +draft.autoContinue || 0, durationSec: +draft.duration || 30,
-          queue: draft.queue.map(q => ({ id: q.id, name: q.name, cost: +q.cost, category: q.category, icon: q.icon || '📦' })),
-          idx: 0, placed: [], decisions: [], phase: 'idle', voteId: null, endsAt: null, durationMs: 0, result: null, rev: 0, createdAt: Date.now()
+          v: 2, code, title: (draft.title || '').trim() || 'Our City', startingBudget: draft.budget, spent: 0, baseline: !!draft.baseline,
+          autoEnd: !!draft.autoEnd, durationSec: +draft.duration || 30, queue, idx: 0, placed, decisions: [], pending: null, extraRows: 0,
+          phase: 'idle', voteId: null, endsAt: null, durationMs: 0, result: null, rev: 0, createdAt: Date.now()
         }, true);
         return;
       }
@@ -701,21 +678,16 @@ async function showHost(code, initial, isNew) {
     transport = await createTransport(code);
     teardown.push(() => transport.close());
     if (isNew) {
-      for (let n = 0; n < 5; n++) {
-        const ex = await timeout(transport.get('state'), 8000);
-        if (!ex) break;
-        code = genCode(); transport.close(); transport = await createTransport(code);
-        teardown.length = 0; teardown.push(() => transport.close());
-      }
-      state.code = code;
-      await timeout(transport.set('tables', null), 8000); await timeout(transport.set('votes', null), 8000);
-      await timeout(transport.set('state', state), 8000);
+      const ex = await timeout(transport.get('state'), 9000);
+      if (ex && !confirm(`Room ${code} already exists. Replace it with this new session?`)) { showSetup(); return; }
+      await timeout(transport.set('tables', null), 9000); await timeout(transport.set('votes', null), 9000);
+      await timeout(transport.set('state', state), 9000);
     } else {
-      state = normalizeState(await timeout(transport.get('state'), 8000));
+      state = normalizeState(await timeout(transport.get('state'), 9000));
       if (!state) { showLanding(`Room ${code} is no longer available. Launch a new host screen.`); return; }
     }
   } catch (err) {
-    showLanding('Could not reach the sync service (' + err.message + '). Check Sync settings and your connection.'); return;
+    showLanding('Could not reach the sync service (' + err.message + '). Check your connection and the Firebase database rules.'); return;
   }
   state = normalizeState(state);
   store.set('civic:lastHost', code);
@@ -723,10 +695,8 @@ async function showHost(code, initial, isNew) {
   /* ---- local runtime ---- */
   let tables = {}, votes = {}, connected = true;
   let durSec = state.durationSec || 30, ending = false, lastBeep = -1, lastSlow = 0, allVotedAt = 0;
-  let resultShownAt = 0, autoPaused = false, finishedDismissed = false;
+  let moveSel = null, finishedDismissed = false;
   const animateIds = new Set();
-  const revealed = new Set(state.placed.map(p => p.id));
-  if (state.phase === 'result' && state.result && state.result.passed) revealed.delete(state.result.itemId);
 
   const curItem = () => state.queue[state.idx] || null;
   const tableList = () => {
@@ -739,10 +709,7 @@ async function showHost(code, initial, isNew) {
   app.innerHTML = `
   <div class="min-h-screen lg:h-screen flex flex-col bg-grid lg:overflow-hidden">
     <header class="shrink-0 h-16 px-4 flex items-center justify-between gap-3 border-b border-slate-200 bg-white">
-      <div class="flex items-center gap-3 min-w-0">
-        ${logoMark(54)}
-        <div class="wordmark text-lg text-slate-600 truncate">Our City</div>
-      </div>
+      <div class="flex items-center min-w-0">${logoImg(46)}</div>
       <button data-act="join" class="flex items-center gap-3 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 px-4 py-1.5" title="Show join instructions">
         <span class="text-xs font-semibold text-slate-500">Join code</span>
         <span class="num text-2xl font-bold text-slate-700 tracking-[.3em] leading-none">${esc(code)}</span>
@@ -777,14 +744,17 @@ async function showHost(code, initial, isNew) {
           </div>
           <div id="cStats" class="flex gap-2 flex-wrap justify-end"></div>
         </div>
+        <div id="cBar" class="shrink-0 mb-3 min-h-[3.5rem]"></div>
         <div id="cGrid" class="flex-1 min-h-0"></div>
-        <div id="cLegend" class="flex flex-wrap gap-2 mt-3 shrink-0 min-h-[1.75rem]"></div>
+        <div class="flex items-center gap-2 mt-3 shrink-0 min-h-[1.75rem]">
+          <div id="cLegend" class="flex flex-wrap gap-2 flex-1"></div>
+          <div class="flex gap-1.5 shrink-0"><button data-act="addrow" class="btn btn-ghost !py-1 !px-2.5 text-xs">＋ Row</button><button data-act="delrow" class="btn btn-ghost !py-1 !px-2.5 text-xs">－ Row</button></div>
+        </div>
       </section>
     </main>
   </div>
   <div id="hOverlay"></div>`;
 
-  /* ---- commit state ---- */
   function commit(fn) {
     fn(state); state.rev = (state.rev || 0) + 1;
     Promise.resolve(transport.set('state', state)).catch(err => toast('Sync error: ' + err.message, 'error'));
@@ -794,7 +764,7 @@ async function showHost(code, initial, isNew) {
   /* ---- actions ---- */
   function startVote() {
     if (state.phase !== 'idle' || !curItem()) return;
-    beep(520, .1); setTimeout(() => beep(780, .14), 110);
+    moveSel = null; beep(520, .1); setTimeout(() => beep(780, .14), 110);
     lastBeep = -1; allVotedAt = 0;
     commit(s => { s.phase = 'voting'; s.voteId = uid(); s.durationSec = durSec; s.durationMs = durSec * 1000; s.endsAt = transport.now() + durSec * 1000; s.result = null; });
   }
@@ -813,20 +783,68 @@ async function showHost(code, initial, isNew) {
     else if (yes > no) { if (item.cost <= rem) { passed = true; reason = 'Majority voted yes'; } else reason = 'Voters approved it, but the budget can’t cover it'; }
     else if (yes === no) reason = 'Tie: a majority is required';
     else reason = 'Majority voted no';
-    const result = { voteId: state.voteId, itemId: item.id, name: item.name, cost: item.cost, icon: item.icon, category: item.category, yes, no, voted: yes + no, total, passed, reason };
+    const result = { voteId: state.voteId, itemId: item.id, name: item.name, cost: item.cost, icon: item.icon, category: item.category, tiles: item.tiles || 1, yes, no, voted: yes + no, total, passed, reason };
     commit(s => {
       s.phase = 'result'; s.result = result;
       s.decisions.push({ itemId: item.id, name: item.name, cost: item.cost, passed, yes, no });
-      if (passed) { const order = fillOrder(s.code, gridDims(s).rows, s.baseline); s.spent += item.cost; s.placed.push({ id: item.id, name: item.name, cost: item.cost, category: item.category, icon: item.icon, slot: order[s.placed.length] ?? null }); }
+      if (passed) s.spent += item.cost;
     });
     ending = false;
   }
-  function continueAfterResult() {
+  function afterResult() {          // Continue button / Space
     if (state.phase !== 'result') return;
+    if (state.result.passed) startPlacing(false); else commit(advanceAfter);
+  }
+  function startPlacing(auto) {
+    if (state.phase !== 'result' || !state.result.passed) return;
     const r = state.result;
-    if (r && r.passed) { revealed.add(r.itemId); animateIds.add(r.itemId); setTimeout(() => beep(196, .25, 'triangle', .14), 450); }
-    commit(s => { s.idx++; s.phase = s.idx >= s.queue.length ? 'finished' : 'idle'; });
+    commit(s => { s.phase = 'placing'; s.pending = { itemId: r.itemId, name: r.name, cost: r.cost, category: r.category, icon: r.icon, total: r.tiles || 1, placed: 0 }; });
+    if (auto) autoPlaceRest();
+  }
+  function placeTile(slot) {
+    const pd = state.pending;
+    if (state.phase !== 'placing' || !pd || state.placed.some(p => p.slot === slot)) return;
+    const pid = uid(); animateIds.add(pid); beep(196, .25, 'triangle', .14);
+    commit(s => {
+      s.placed.push({ pid, itemId: pd.itemId, name: pd.name, cost: pd.cost, category: pd.category, icon: pd.icon, slot, n: pd.placed, of: pd.total });
+      s.pending.placed++;
+      if (s.pending.placed >= s.pending.total) advanceAfter(s);
+    });
     animateIds.clear();
+  }
+  function autoPlaceRest() {
+    if (state.phase !== 'placing' || !state.pending) return;
+    beep(196, .25, 'triangle', .14);
+    commit(s => {
+      const pd = s.pending, need = pd.total - pd.placed;
+      while (freeSlots(s).length < need) s.extraRows = (s.extraRows || 0) + 1;
+      const free = freeSlots(s);
+      for (let k = 0; k < need; k++) {
+        const pid = uid(); animateIds.add(pid);
+        s.placed.push({ pid, itemId: pd.itemId, name: pd.name, cost: pd.cost, category: pd.category, icon: pd.icon, slot: free[k], n: pd.placed + k, of: pd.total });
+      }
+      advanceAfter(s);
+    });
+    animateIds.clear();
+  }
+  function donePlacing() {
+    if (state.phase !== 'placing' || !state.pending) return;
+    if (state.pending.placed < 1) { toast('Place at least one tile first'); return; }
+    commit(advanceAfter);
+  }
+  function cellClick(i) {
+    if (state.phase === 'result') return;
+    const tile = state.placed.find(p => p.slot === i);
+    if (moveSel != null) {
+      if (i === moveSel) { moveSel = null; renderCity(); renderBar(); return; }
+      const fromPid = state.placed.find(p => p.slot === moveSel)?.pid;
+      moveSel = null;
+      commit(s => { const a = s.placed.find(p => p.pid === fromPid), b = s.placed.find(p => p.slot === i); if (!a) return; if (b) b.slot = a.slot; a.slot = i; });
+      beep(330, .08, 'triangle', .08);
+      return;
+    }
+    if (tile) { moveSel = i; renderCity(); renderBar(); return; }
+    if (state.phase === 'placing' && state.pending) placeTile(i);
   }
   function skipItem() {
     if (state.phase !== 'idle' || state.queue.length - state.idx < 2) { toast('No other item to skip to'); return; }
@@ -834,7 +852,14 @@ async function showHost(code, initial, isNew) {
   }
   function finishSession() {
     if (!confirm('Finish the session now? Remaining items will not be voted on.')) return;
-    commit(s => { s.phase = 'finished'; });
+    commit(s => { s.phase = 'finished'; s.pending = null; });
+  }
+  function addRow() { commit(s => { s.extraRows = (s.extraRows || 0) + 1; }); }
+  function delRow() {
+    const { rows } = gridDims(state);
+    if (!state.extraRows) { toast('The grid is already at its minimum size'); return; }
+    if (state.placed.some(p => p.slot >= (rows - 1) * COLS)) { toast('Move the tiles out of the bottom row first'); return; }
+    commit(s => { s.extraRows--; });
   }
 
   /* ---- renderers ---- */
@@ -850,22 +875,24 @@ async function showHost(code, initial, isNew) {
   function renderItem() {
     const it = curItem(), rem = remaining(state), n = state.queue.length;
     if (state.phase === 'finished' || !it) {
-      setHTML($('#cItem'), `<div class="text-center py-6"><div class="text-6xl mb-2">🎉</div><div class="font-display text-3xl font-bold">All items decided</div><div class="text-slate-500 mt-1">Your city is complete.</div></div>`);
+      setHTML($('#cItem'), `<div class="text-center py-6"><div class="text-6xl mb-2">🎉</div><div class="font-display text-3xl font-semibold">All items decided</div><div class="text-slate-500 mt-1">Your city is complete.</div></div>`);
       return;
     }
     const c = catColor(it.category), over = it.cost > rem, pct = Math.round(it.cost / Math.max(rem, 1) * 100);
     const live = state.phase === 'voting';
+    const status = live ? '● Voting open' : state.phase === 'result' ? 'Decision made' : state.phase === 'placing' ? 'Placing on the grid' : 'Up for vote';
+    const pre = state.phase === 'idle' || live;
     setHTML($('#cItem'), `
       <div class="flex items-center justify-between mb-3">
-        <span class="chip" style="background:${c}26;color:#0f172a;border-color:${c}">${esc(it.category)}</span>
-        <span class="text-xs font-semibold ${live ? 'text-emerald-600' : 'text-slate-500'}">${live ? '● Voting open' : state.phase === 'result' ? 'Decision made' : 'Up for vote'} · Item ${state.idx + 1} of ${n}</span>
+        <span class="chip" style="background:${c}26;color:#38393b;border-color:${c}">${esc(it.category)}${(it.tiles || 1) > 1 ? ` · ${it.tiles} tiles` : ''}</span>
+        <span class="text-xs font-semibold ${live ? 'text-emerald-600' : 'text-slate-500'}">${status} · Item ${state.idx + 1} of ${n}</span>
       </div>
       <div class="flex items-center gap-5">
         <div class="w-24 h-24 xl:w-36 xl:h-36 shrink-0 rounded-3xl grid place-items-center text-6xl xl:text-8xl ${live ? 'glow' : ''}" style="background:${c}1f;border:2px solid ${c}66">${iconHTML(it.icon)}</div>
         <div class="min-w-0 flex-1">
-          <h2 class="font-display text-2xl xl:text-4xl font-bold leading-tight text-slate-900">${esc(it.name)}</h2>
+          <h2 class="font-display text-2xl xl:text-4xl font-semibold leading-tight text-slate-900">${esc(it.name)}</h2>
           <div class="num text-3xl xl:text-5xl font-bold text-slate-900 mt-1">${fmt(it.cost)}</div>
-          <div class="text-sm text-slate-500 mt-0.5">${over ? '<span class="font-bold text-amber-600">More than the remaining budget, so it cannot be funded</span>' : pct + '% of the remaining budget'}</div>
+          <div class="text-sm text-slate-500 mt-0.5">${pre && over ? '<span class="font-bold text-amber-600">More than the remaining budget, so it cannot be funded</span>' : pre ? pct + '% of the remaining budget' : ''}</div>
         </div>
       </div>`);
   }
@@ -873,16 +900,15 @@ async function showHost(code, initial, isNew) {
     const tl = tableList(), visible = tl.filter(t => t.online || t.voted), online = tl.filter(t => t.online).length;
     const vs = votes?.[state.voteId] || {}, voted = state.phase === 'voting' || state.phase === 'result' ? Object.keys(vs).length : 0;
     const total = Math.max(online, voted);
+    const inVote = state.phase === 'voting' || state.phase === 'result';
     const chips = visible.length ? visible.map(t => {
-      const inVote = state.phase === 'voting' || state.phase === 'result';
-      const cls = t.voted ? 'bg-emerald-400/20 text-emerald-200 border-emerald-400/40' : t.online ? 'bg-white/5 text-slate-200 border-white/10' : 'bg-white/5 text-slate-400 border-white/5';
+      const cls = t.voted ? 'bg-emerald-400/25 text-emerald-200 border-emerald-400/40' : t.online ? 'bg-white/5 text-slate-200 border-white/10' : 'bg-white/5 text-slate-400 border-white/5';
       return `<span class="chip ${cls} !text-xs">${inVote ? (t.voted ? '✓' : '…') : '●'} ${esc(t.name)}</span>`;
     }).join('') : `<span class="text-sm text-slate-300">No tables yet. Tables join with code <b class="text-white num tracking-widest">${esc(code)}</b>.</span>`;
     let top = '';
     if (state.phase === 'idle') {
-      const it = curItem();
       top = `<div class="flex gap-3 items-stretch">
-        <button data-act="start" class="btn btn-green flex-1 !text-xl xl:!text-2xl !py-4 xl:!py-5 !rounded-2xl" ${it ? '' : 'disabled'}>▶ Start vote</button>
+        <button data-act="start" class="btn btn-green flex-1 !text-xl xl:!text-2xl !py-4 xl:!py-5 !rounded-2xl" ${curItem() ? '' : 'disabled'}>▶ Start vote</button>
         <select id="vDur" class="rounded-2xl bg-slate-800 text-white font-bold px-3 border border-white/10" aria-label="Vote length">${[15, 20, 30, 45, 60, 90].map(v => `<option value="${v}" ${v === durSec ? 'selected' : ''}>${v}s</option>`).join('')}</select>
       </div><div class="text-xs text-slate-300 mt-2">Press Space to start · ${online} ${online === 1 ? 'table' : 'tables'} connected</div>`;
     } else if (state.phase === 'voting') {
@@ -898,7 +924,10 @@ async function showHost(code, initial, isNew) {
         </div>
         <div class="flex gap-1.5 mt-2">${Array.from({ length: Math.max(total, 1) }, (_, i) => `<div class="h-2 flex-1 rounded-full ${i < voted ? 'bg-emerald-400' : 'bg-white/20'}"></div>`).join('')}</div>`;
     } else if (state.phase === 'result') {
-      top = `<div class="flex items-center justify-between gap-3"><div class="text-slate-300 font-semibold">Result is on screen</div><button data-act="continue" class="btn btn-green">Continue</button></div>`;
+      const ok = state.result && state.result.passed;
+      top = `<div class="flex items-center justify-between gap-3"><div class="text-slate-300 font-semibold">Result is on screen</div><button data-act="continue" class="btn btn-green">${ok ? 'Choose a spot' : 'Next item'}</button></div>`;
+    } else if (state.phase === 'placing' && state.pending) {
+      top = `<div class="text-slate-200 font-semibold">Place <b class="text-white">${esc(state.pending.name)}</b> on the city grid.</div><div class="text-sm text-slate-300 mt-1">Tile ${Math.min(state.pending.placed + 1, state.pending.total)} of ${state.pending.total}. Click an empty lot.</div>`;
     } else {
       top = `<div class="flex items-center justify-between gap-3"><div class="text-slate-300 font-semibold">Session complete</div><button data-act="summary" class="btn btn-green">View summary</button></div>`;
     }
@@ -910,29 +939,49 @@ async function showHost(code, initial, isNew) {
     setHTML($('#cNext'), up.length && state.phase !== 'finished'
       ? `<div class="text-xs font-semibold text-slate-500 mb-2">Up next</div><div class="flex gap-2 flex-wrap items-center">${up.map(q => `<div class="flex items-center gap-2 rounded-xl bg-white border border-slate-200 px-2.5 py-1.5" title="${esc(q.name)} · ${fmt(q.cost)}"><span class="text-xl leading-none">${iconHTML(q.icon)}</span><span class="text-xs font-semibold text-slate-600 max-w-[7rem] truncate">${esc(q.name)}</span></div>`).join('')}${state.queue.length - state.idx - 1 > 6 ? `<span class="text-xs text-slate-500">+${state.queue.length - state.idx - 7} more</span>` : ''}</div>` : '');
   }
+  function renderBar() {
+    let html = '';
+    const sel = moveSel != null ? state.placed.find(p => p.slot === moveSel) : null;
+    if (sel) {
+      html = `<div class="bar-dark rounded-2xl bg-slate-700 text-white px-4 py-2.5 flex items-center gap-3 min-h-[3.5rem]">
+        <span class="text-2xl leading-none">${iconHTML(sel.icon)}</span>
+        <div class="flex-1 min-w-0 text-sm"><b>Moving ${esc(sel.name)}.</b> Click an empty lot to move it, or another tile to swap places.</div>
+        <button data-act="cancelmove" class="btn btn-ghost !py-1.5 text-sm">Cancel</button></div>`;
+    } else if (state.phase === 'placing' && state.pending) {
+      const pd = state.pending, left = pd.total - pd.placed;
+      html = `<div class="rounded-2xl bg-emerald-100 border border-emerald-300 text-emerald-900 px-4 py-2.5 flex items-center gap-3 min-h-[3.5rem]">
+        <span class="text-2xl leading-none">${iconHTML(pd.icon)}</span>
+        <div class="flex-1 min-w-0 text-sm"><b>Place ${esc(pd.name)}:</b> tile ${pd.placed + 1} of ${pd.total}. Click an empty lot.${pd.total > 1 ? ` (${left} to go)` : ''}</div>
+        <button data-act="autoplace" class="btn btn-light !py-1.5 text-sm">Auto-place${pd.total > 1 ? ' rest' : ''}</button>
+        ${pd.total > 1 ? `<button data-act="doneplace" class="btn btn-dark !py-1.5 text-sm" ${pd.placed < 1 ? 'disabled' : ''}>Done</button>` : ''}</div>`;
+    } else {
+      html = `<div class="px-1 py-2 text-sm text-slate-500">Tip: click any tile, then an empty lot, to move it. Click another tile to swap.</div>`;
+    }
+    setHTML($('#cBar'), html);
+  }
   function renderCity() {
-    const { rows } = gridDims(state);
-    const visible = state.placed.filter(p => revealed.has(p.id));
-    const sig = rows + '|' + state.baseline + '|' + visible.map(p => p.id + ':' + p.slot).join(',');
-    const grid = $('#cGrid');
+    const { rows } = gridDims(state), grid = $('#cGrid');
+    const placing = state.phase === 'placing' && state.pending;
+    const sig = [rows, placing ? 'P' : '', moveSel, state.placed.map(p => p.pid + ':' + p.slot).join(',')].join('|');
     if (grid._sig !== sig) {
       grid._sig = sig;
-      const cells = new Array(rows * COLS).fill(null);
-      if (state.baseline) baselineTiles(rows).forEach(t => { cells[t.r * COLS + t.c] = { ...t, base: true, id: 'base' + t.r + t.c }; });
-      visible.forEach(p => { let s = p.slot; if (s == null || cells[s]) s = cells.findIndex(x => !x); if (s >= 0) cells[s] = p; });
-      grid.innerHTML = `<div class="city-grid" style="grid-template-columns:repeat(${COLS},minmax(0,1fr));grid-template-rows:repeat(${rows},minmax(0,1fr))">${cells.map(c => {
-        if (!c) return '<div class="lot"></div>';
-        const col = catColor(c.category);
-        return `<div class="tile ${c.base ? 'tile-base' : ''} ${animateIds.has(c.id) ? 'tile-new' : ''}" style="--cb:${col}99;--c1:${col}4d;--c2:${col}14" title="${esc(c.name)}">
-          <div class="tile-icon">${iconHTML(c.icon)}</div><div class="tile-name">${esc(c.name)}</div>
-          ${c.base ? '<div class="tile-tag">Existing</div>' : `<div class="tile-cost">${fmtShort(c.cost)}</div>`}</div>`;
-      }).join('')}</div>`;
+      const occ = new Map(); state.placed.forEach(p => { if (p.slot != null) occ.set(p.slot, p); });
+      let cells = '';
+      for (let i = 0; i < rows * COLS; i++) {
+        const p = occ.get(i);
+        if (!p) { cells += `<button class="lot ${(placing || moveSel != null) ? 'lot-hot' : ''}" data-cell="${i}" aria-label="Empty lot"></button>`; continue; }
+        const col = catColor(p.category), label = p.base ? 'Existing' : (p.n ? `${p.n + 1}/${p.of}` : fmtShort(p.cost));
+        cells += `<div class="tile ${p.base ? 'tile-base' : ''} ${animateIds.has(p.pid) ? 'tile-new' : ''} ${moveSel === i ? 'tile-sel' : ''}" data-cell="${i}" style="--cb:${col}99;--c1:${col}4d;--c2:${col}14" title="${esc(p.name)}">
+          <div class="tile-icon">${iconHTML(p.icon)}</div><div class="tile-name">${esc(p.name)}</div>
+          <div class="${p.base ? 'tile-tag' : 'tile-cost'}">${label}</div></div>`;
+      }
+      grid.innerHTML = `<div class="city-grid" style="grid-template-columns:repeat(${COLS},minmax(0,1fr));grid-template-rows:repeat(${rows},minmax(0,1fr))">${cells}</div>`;
     }
-    const n = visible.length, inv = visible.reduce((a, p) => a + p.cost, 0);
+    const built = builtItems(state), n = built.length;
     $('#cTitle').textContent = state.title; document.title = state.title + ' · Our City';
     $('#cSub').textContent = `${cityTier(n)} · ${n === 0 ? 'nothing built yet. Every approved project lands here.' : n + ' ' + (n === 1 ? 'project' : 'projects') + ' built'}`;
-    setHTML($('#cStats'), `<span class="chip bg-emerald-50 text-emerald-700 border-emerald-200 !text-sm">${fmt(inv)} invested</span>`);
-    const counts = {}; visible.forEach(p => counts[p.category] = (counts[p.category] || 0) + 1);
+    setHTML($('#cStats'), `<span class="chip bg-emerald-50 text-emerald-700 border-emerald-200 !text-sm">${fmt(state.spent)} invested</span>`);
+    const counts = {}; built.forEach(p => counts[p.category] = (counts[p.category] || 0) + 1);
     setHTML($('#cLegend'), Object.entries(counts).map(([k, v]) => `<span class="chip !text-xs" style="background:${catColor(k)}22;color:#38393b;border-color:${catColor(k)}88"><span class="w-2 h-2 rounded-full" style="background:${catColor(k)}"></span>${esc(k)} ${v}</span>`).join(''));
   }
   function renderOverlay() {
@@ -942,23 +991,21 @@ async function showHost(code, initial, isNew) {
     else if (state.phase === 'finished' && !finishedDismissed) { sig = 'f'; html = finishedOverlay(); }
     if (el._sig === sig) return;
     el._sig = sig; el.innerHTML = html;
-    if (sig[0] === 'r') {
-      resultShownAt = performance.now(); autoPaused = false;
-      chime(state.result.passed); if (state.result.passed) confetti();
-    } else if (sig === 'f') { confetti(120); chime(true); }
+    if (sig[0] === 'r') { chime(state.result.passed); if (state.result.passed) confetti(); }
+    else if (sig === 'f') { confetti(120); chime(true); }
   }
   function resultOverlay(r) {
     const tot = r.yes + r.no, yp = tot ? Math.round(r.yes / tot * 100) : 0, np = tot ? 100 - yp : 0, ok = r.passed, c = catColor(r.category);
-    return `<div class="fixed inset-0 z-[70] grid place-items-center p-4 md:p-8 bg-slate-950/80 backdrop-blur-md fade-in">
+    return `<div class="fixed inset-0 z-[70] grid place-items-center p-4 md:p-8 bg-slate-950/75 backdrop-blur-md fade-in">
       <div class="pop w-[min(96vw,1000px)] rounded-[2rem] overflow-hidden bg-white text-slate-900 shadow-2xl">
         <div class="px-6 md:px-10 py-4 md:py-5 flex items-center justify-between gap-4 text-white ${ok ? 'bg-emerald-500' : 'bg-rose-500'}">
-          <div class="font-display font-bold text-2xl md:text-4xl">${ok ? '✓ Approved' : '✕ Not approved'}</div>
+          <div class="font-display font-semibold text-2xl md:text-4xl">${ok ? '✓ Approved' : '✕ Not approved'}</div>
           <div class="text-sm md:text-lg font-semibold text-right opacity-95">${esc(r.reason)}</div>
         </div>
         <div class="p-6 md:p-10 grid md:grid-cols-2 gap-8 items-center">
           <div class="text-center">
             <div class="mx-auto w-36 h-36 md:w-52 md:h-52 rounded-[2rem] grid place-items-center text-8xl md:text-9xl" style="background:${c}1f;border:3px solid ${c}77">${iconHTML(r.icon)}</div>
-            <h2 class="font-display text-2xl md:text-4xl font-bold mt-4 leading-tight">${esc(r.name)}</h2>
+            <h2 class="font-display text-2xl md:text-4xl font-semibold mt-4 leading-tight">${esc(r.name)}</h2>
             <div class="num text-2xl md:text-4xl font-bold mt-1 ${ok ? 'text-emerald-600' : 'text-slate-400 line-through'}">${fmt(r.cost)}</div>
           </div>
           <div>
@@ -972,19 +1019,21 @@ async function showHost(code, initial, isNew) {
             <div class="text-sm text-slate-500 mt-3">${r.voted} of ${r.total} ${r.total === 1 ? 'table' : 'tables'} voted${ok ? ` · ${fmt(remaining(state))} left in the budget` : ''}</div>
           </div>
         </div>
-        ${state.autoContinue > 0 ? `<div id="autoBar" class="h-1.5 bg-slate-100"><div class="h-full bg-slate-800 drain" style="animation-duration:${state.autoContinue}s"></div></div>` : ''}
-        <div class="px-6 md:px-10 py-4 bg-slate-50 flex items-center justify-between gap-3">
-          <div class="text-sm text-slate-500">${ok ? 'Adding to the city…' : 'Moving to the next item…'}${state.autoContinue > 0 ? ' <button id="pauseBtn" data-act="pause" class="underline font-semibold ml-2">Pause</button>' : ''}</div>
-          <button data-act="continue" class="btn btn-dark !px-6 !py-3 !text-lg">${ok ? 'Add to city' : 'Next item'}</button>
+        <div class="px-6 md:px-10 py-4 bg-slate-50 flex items-center justify-between gap-3 flex-wrap">
+          <div class="text-sm text-slate-500">${ok ? `Next: choose where ${(r.tiles || 1) > 1 ? 'its ' + r.tiles + ' tiles go' : 'it goes'} on the city grid.` : 'This project won’t be built.'}</div>
+          <div class="flex gap-3">
+            ${ok ? `<button data-act="autoplace" class="btn btn-light !px-5 !py-3">Auto-place</button><button data-act="continue" class="btn btn-dark !px-6 !py-3 !text-lg">Choose a spot</button>`
+                 : `<button data-act="continue" class="btn btn-dark !px-6 !py-3 !text-lg">Next item</button>`}
+          </div>
         </div>
       </div></div>`;
   }
   function finishedOverlay() {
     const ok = state.decisions.filter(d => d.passed), no = state.decisions.filter(d => !d.passed);
-    return `<div class="fixed inset-0 z-[70] grid place-items-center p-4 md:p-8 bg-slate-950/85 backdrop-blur-md fade-in">
+    return `<div class="fixed inset-0 z-[70] grid place-items-center p-4 md:p-8 bg-slate-950/80 backdrop-blur-md fade-in">
       <div class="pop w-[min(96vw,900px)] max-h-[92vh] overflow-auto rounded-[2rem] bg-white text-slate-900 shadow-2xl p-6 md:p-10">
-        <div class="text-center"><div class="text-6xl">🎉</div><h2 class="font-display text-3xl md:text-5xl font-bold mt-2">${esc(state.title)} is built</h2>
-          <p class="text-slate-500 mt-2">${cityTier(ok.length)} with ${ok.length} ${ok.length === 1 ? 'project' : 'projects'} funded.</p></div>
+        <div class="text-center"><div class="text-6xl">🎉</div><h2 class="wordmark text-2xl md:text-4xl text-slate-600 mt-3">${esc(state.title)}</h2>
+          <p class="text-slate-500 mt-3">${cityTier(ok.length)} with ${ok.length} ${ok.length === 1 ? 'project' : 'projects'} funded.</p></div>
         <div class="grid grid-cols-3 gap-3 md:gap-5 mt-7">
           <div class="rounded-2xl bg-emerald-50 p-4 text-center"><div class="text-xs font-bold text-emerald-700">Left in budget</div><div class="num text-xl md:text-4xl font-bold text-emerald-600 mt-1">${fmt(remaining(state))}</div></div>
           <div class="rounded-2xl bg-rose-50 p-4 text-center"><div class="text-xs font-bold text-rose-700">Spent</div><div class="num text-xl md:text-4xl font-bold text-rose-600 mt-1">${fmt(state.spent)}</div></div>
@@ -998,10 +1047,10 @@ async function showHost(code, initial, isNew) {
   }
   function renderConn() {
     const n = tableList().filter(t => t.online).length;
-    setHTML($('#hConn'), `<span class="inline-flex items-center gap-1.5"><span class="w-2 h-2 rounded-full ${connected ? 'bg-emerald-400' : 'bg-rose-500 animate-pulse'}"></span>${transport.mode === 'firebase' ? (connected ? 'Live sync' : 'Reconnecting…') : 'Local demo'}</span><span class="text-slate-500">|</span><span>${n} ${n === 1 ? 'table' : 'tables'} online</span>`);
+    setHTML($('#hConn'), `<span class="inline-flex items-center gap-1.5"><span class="w-2 h-2 rounded-full ${connected ? 'bg-emerald-400' : 'bg-rose-500 animate-pulse'}"></span>${connected ? 'Live sync' : 'Reconnecting…'}</span><span class="text-slate-400">|</span><span>${n} ${n === 1 ? 'table' : 'tables'} online</span>`);
     $('#hSound').textContent = soundOn ? '🔊' : '🔇';
   }
-  function renderAll() { renderBudget(); renderItem(); renderVote(); renderNext(); renderCity(); renderOverlay(); renderConn(); }
+  function renderAll() { renderBudget(); renderItem(); renderVote(); renderNext(); renderCity(); renderBar(); renderOverlay(); renderConn(); }
 
   /* ---- timer / loop ---- */
   function tick(renderOnly) {
@@ -1017,8 +1066,6 @@ async function showHost(code, initial, isNew) {
         const voted = Object.keys(votes?.[state.voteId] || {}).length, online = tableList().filter(x => x.online).length;
         if (voted > 0 && voted >= online) { if (!allVotedAt) allVotedAt = now; else if (now - allVotedAt > 1200) endVote(); } else allVotedAt = 0;
       }
-    } else if (state.phase === 'result' && !renderOnly) {
-      if (state.autoContinue > 0 && !autoPaused && performance.now() - resultShownAt > state.autoContinue * 1000) continueAfterResult();
     }
     if (!renderOnly && performance.now() - lastSlow > 1500) { lastSlow = performance.now(); renderVote(); renderConn(); }
   }
@@ -1031,31 +1078,37 @@ async function showHost(code, initial, isNew) {
   beat(); const hb = setInterval(beat, HEARTBEAT_MS); teardown.push(() => clearInterval(hb));
   const loop = setInterval(() => tick(false), 200); teardown.push(() => clearInterval(loop));
 
-  const onChange = e => { if (e.target.id === 'vDur') { durSec = +e.target.value; } };
+  const onChange = e => { if (e.target.id === 'vDur') durSec = +e.target.value; };
   const onClick = e => {
+    const cell = e.target.closest('[data-cell]');
+    if (cell) { cellClick(+cell.dataset.cell); return; }
     const b = e.target.closest('[data-act]'); if (!b) return;
     b.blur && b.blur();
     switch (b.dataset.act) {
       case 'start': startVote(); break;
       case 'end': endVote(); break;
-      case 'continue': continueAfterResult(); break;
-      case 'pause': autoPaused = true; $('#autoBar')?.remove(); $('#pauseBtn')?.remove(); break;
-      case 'skip': skipItem(); break;
+      case 'continue': afterResult(); break;
+      case 'autoplace': if (state.phase === 'result') startPlacing(true); else autoPlaceRest(); break;
+      case 'doneplace': donePlacing(); break;
+      case 'cancelmove': moveSel = null; renderCity(); renderBar(); break;
+      case 'addrow': addRow(); break;
+      case 'delrow': delRow(); break;
       case 'sound': soundOn = !soundOn; store.set('civic:sound', soundOn); renderConn(); beep(660); break;
       case 'fs': if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen?.().catch(() => {}); break;
       case 'summary': finishedDismissed = false; $('#hOverlay')._sig = null; renderOverlay(); break;
-      case 'closeSummary': finishedDismissed = true; renderOverlay(); $('#hOverlay').innerHTML = ''; $('#hOverlay')._sig = 'x'; break;
+      case 'closeSummary': finishedDismissed = true; $('#hOverlay')._sig = null; renderOverlay(); break;
       case 'newSession': if (confirm('Start a new session? This closes the current room.')) { transport.set('state', null); showSetup(); } break;
       case 'join': openJoinModal(); break;
       case 'menu': openMenu(); break;
     }
   };
   const onKey = e => {
+    if (e.key === 'Escape' && moveSel != null) { moveSel = null; renderCity(); renderBar(); return; }
     if (/^(INPUT|SELECT|TEXTAREA|BUTTON)$/.test(e.target.tagName)) return;
     if (document.querySelector('.fixed.z-\\[80\\]')) return;
     if ([' ', 'Enter', 'ArrowRight', 'PageDown'].includes(e.key)) {
       e.preventDefault();
-      if (state.phase === 'idle') startVote(); else if (state.phase === 'result') continueAfterResult();
+      if (state.phase === 'idle') startVote(); else if (state.phase === 'result') afterResult();
       else if (state.phase === 'voting' && e.key === 'Enter' && e.shiftKey) endVote();
     }
   };
@@ -1064,7 +1117,7 @@ async function showHost(code, initial, isNew) {
 
   function openMenu() {
     const m = openModal(`<div class="p-6">
-      <div class="flex items-center justify-between mb-4"><h2 class="font-display text-xl font-bold">Session controls</h2><button data-close class="btn btn-light !px-3 !py-1.5">✕</button></div>
+      <div class="flex items-center justify-between mb-4"><h2 class="font-display text-xl font-semibold">Session controls</h2><button data-close class="btn btn-light !px-3 !py-1.5">✕</button></div>
       <div class="space-y-2">
         <button id="mRename" class="btn btn-light w-full !justify-start">✎ Rename the city</button>
         <button id="mSkip" class="btn btn-light w-full !justify-start">↷ Skip current item (move it to the end of the queue)</button>
@@ -1074,23 +1127,24 @@ async function showHost(code, initial, isNew) {
       </div></div>`);
     $('#mRename', m).onclick = () => { m.close(); const nn = prompt('Name your city', state.title); if (nn && nn.trim()) commit(s => { s.title = nn.trim().slice(0, 32); }); };
     $('#mSkip', m).onclick = () => { m.close(); skipItem(); };
-    $('#mFinish', m).onclick = () => { m.close(); if (state.phase === 'idle') finishSession(); else toast('Wait for the current vote to finish first'); };
+    $('#mFinish', m).onclick = () => { m.close(); if (state.phase === 'idle') finishSession(); else toast('Wait for the current vote and placement to finish first'); };
     $('#mNew', m).onclick = () => { m.close(); if (confirm('Close this room and start a new setup?')) { transport.set('state', null); store.del('civic:lastHost'); showSetup(); } };
     $('#mExit', m).onclick = () => { m.close(); showLanding(); };
   }
   function openJoinModal() {
-    const url = location.href.split('#')[0] + '#join=' + code;
+    const url = joinDirectURL(code), clean = joinPageURL();
     const m = openModal(`<div class="p-7 text-center">
       <div class="flex justify-end"><button data-close class="btn btn-light !px-3 !py-1.5">✕</button></div>
-      <div class="text-slate-500 font-semibold">Open this page on your device, tap “Vote from a table” and enter</div>
+      <div class="text-slate-500 font-semibold">Open the table link and enter</div>
       <div class="num text-7xl md:text-8xl font-bold tracking-[.25em] text-slate-900 mt-2 pl-[.25em]">${esc(code)}</div>
       <div id="qr" class="mx-auto mt-5 w-[220px] h-[220px] grid place-items-center"></div>
-      <div class="text-xs text-slate-500 mt-3 break-all">${esc(url)}</div>
-      ${transport.mode === 'local' ? '<div class="mt-4 text-sm rounded-xl bg-amber-50 text-amber-800 p-3">Local demo mode: only other tabs in this browser can join. Connect Firebase in ⚙ Sync settings (home screen) for real devices.</div>' : ''}
+      <div class="text-sm font-semibold text-slate-700 mt-3 break-all">${esc(clean)}</div>
+      <button id="cpy" class="btn btn-light mt-3 !py-2 text-sm">Copy link with code</button>
     </div>`, 'max-w-md');
+    $('#cpy', m).onclick = () => copyText(url);
     loadScript('https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js')
       .then(() => { new QRCode($('#qr', m), { text: url, width: 220, height: 220, correctLevel: QRCode.CorrectLevel.M }); })
-      .catch(() => { $('#qr', m).innerHTML = '<div class="text-sm text-slate-400">QR code unavailable offline</div>'; });
+      .catch(() => { $('#qr', m).innerHTML = '<div class="text-sm text-slate-400">QR code unavailable</div>'; });
   }
 
   renderAll(); tick(true);
@@ -1105,16 +1159,13 @@ async function showTable(code, name) {
   let transport, state;
   try { transport = await createTransport(code); teardown.push(() => transport.close()); }
   catch (e) { showLanding('Could not start sync: ' + e.message); return; }
-  try { state = normalizeState(await timeout(transport.get('state'), 8000)); }
+  try { state = normalizeState(await timeout(transport.get('state'), 9000)); }
   catch { showLanding('Could not reach the room. Check your connection and try again.'); return; }
-  if (!state) {
-    showLanding(`Room ${code} wasn’t found. Check the code on the main screen.` + (transport.mode === 'local' ? ' Local demo mode only reaches other tabs in this browser. Turn on live sync in ⚙ for separate devices.' : ''));
-    return;
-  }
+  if (!state) { showLanding(`Room ${code} wasn’t found. Check the code on the main screen.`); return; }
   store.set('civic:lastTable', { code, name });
   const tid = slug(name);
   const lockKey = vid => `civic:vote:${code}:${vid}:${tid}`;
-  let hostSeen = 0, connected = true, remoteVote = null, voteKey = null, unsubMine = null, acked = null, wasOver = false, lastHostOn = null, lastSlow = 0;
+  let hostSeen = 0, connected = true, remoteVote = null, voteKey = null, unsubMine = null, acked = null, wasOver = false, lastHostOn = null;
 
   const reg = () => Promise.resolve(transport.set('tables/' + tid, { name, lastSeen: transport.now() })).catch(() => {});
   reg(); const hb = setInterval(reg, HEARTBEAT_MS); teardown.push(() => clearInterval(hb));
@@ -1138,24 +1189,24 @@ async function showTable(code, name) {
       <div class="flex items-center gap-2 min-w-0"><span class="chip bg-emerald-400 text-emerald-950 !text-sm !px-3 !py-1 truncate max-w-[12rem]">${esc(name)}</span><span class="num text-slate-700 font-bold tracking-widest">${esc(code)}</span></div>
       <div class="flex items-center gap-3"><span class="inline-flex items-center gap-1.5 text-xs font-semibold ${on ? 'text-emerald-700' : 'text-amber-600'}"><span class="w-2 h-2 rounded-full ${on ? 'bg-emerald-400' : 'bg-amber-400 animate-pulse'}"></span>${!connected ? 'Reconnecting…' : hostOnline() ? 'Connected' : 'Host offline'}</span>
       <button data-act="leave" class="text-xs text-slate-500 underline">Leave</button></div></header>
-      <div class="px-4 pb-3 text-center flex flex-col items-center">${logoMark(44)}<div class="wordmark text-lg text-slate-600 truncate max-w-full mt-1">${esc(state.title)}</div></div>`;
+      <div class="px-4 pb-3 text-center flex flex-col items-center">${logoImg(52)}<div class="wordmark text-lg text-slate-600 truncate max-w-full mt-2">${esc(state.title)}</div></div>`;
   }
-  function budgetCard(extra = '') {
+  function budgetCard() {
     const rem = remaining(state), pct = Math.max(0, Math.min(100, rem / state.startingBudget * 100));
     return `<div class="card p-5">
       <div class="flex justify-between items-end gap-3">
         <div><div class="text-xs font-semibold text-slate-500">City budget remaining</div><div class="num text-4xl md:text-5xl font-bold ${rem <= 0 ? 'text-rose-600' : 'text-emerald-600'}">${fmt(rem)}</div></div>
         <div class="text-right"><div class="text-xs font-semibold text-slate-500">Spent</div><div class="num text-xl font-bold text-rose-600">${fmt(state.spent)}</div></div>
       </div>
-      <div class="h-2.5 rounded-full bg-rose-100 overflow-hidden mt-3"><div class="h-full ${pct < 15 ? 'bg-amber-500' : 'bg-emerald-500'}" style="width:${pct}%"></div></div>${extra}</div>`;
+      <div class="h-2.5 rounded-full bg-rose-100 overflow-hidden mt-3"><div class="h-full ${pct < 15 ? 'bg-amber-500' : 'bg-emerald-500'}" style="width:${pct}%"></div></div></div>`;
   }
-  function itemHeader(it, big) {
+  function itemHeader(it) {
     const c = catColor(it.category);
-    return `<div class="flex items-center gap-4"><div class="${big ? 'w-24 h-24 text-6xl' : 'w-16 h-16 text-4xl'} shrink-0 rounded-2xl grid place-items-center" style="background:${c}1f;border:2px solid ${c}66">${iconHTML(it.icon)}</div>
-      <div class="min-w-0"><span class="chip" style="background:${c}26;border-color:${c}">${esc(it.category)}</span><h2 class="font-display text-2xl md:text-3xl font-bold leading-tight mt-1">${esc(it.name)}</h2></div></div>`;
+    return `<div class="flex items-center gap-4"><div class="w-16 h-16 text-4xl shrink-0 rounded-2xl grid place-items-center" style="background:${c}1f;border:2px solid ${c}66">${iconHTML(it.icon)}</div>
+      <div class="min-w-0"><span class="chip" style="background:${c}26;border-color:${c}">${esc(it.category)}</span><h2 class="font-display text-2xl md:text-3xl font-semibold leading-tight mt-1">${esc(it.name)}</h2></div></div>`;
   }
   function cityStrip() {
-    const p = state.placed;
+    const p = builtItems(state);
     return `<div class="panel p-4 mt-auto"><div class="text-xs font-semibold text-slate-300 mb-2">Your city so far · ${p.length} ${p.length === 1 ? 'project' : 'projects'}</div>
       <div class="flex flex-wrap gap-1.5">${p.length ? p.map(x => `<span class="w-10 h-10 rounded-xl grid place-items-center text-2xl" style="background:${catColor(x.category)}2e;border:1.5px solid ${catColor(x.category)}88" title="${esc(x.name)}">${iconHTML(x.icon)}</span>`).join('') : '<span class="text-sm text-slate-300">Nothing built yet.</span>'}</div></div>`;
   }
@@ -1171,18 +1222,18 @@ async function showTable(code, name) {
       if (mine) {
         action = `<div class="card p-6 text-center pop flex-1 grid place-items-center">
           <div><div class="check-pop mx-auto w-24 h-24 rounded-full grid place-items-center text-6xl text-white ${mine === 'yes' ? 'bg-emerald-500' : 'bg-rose-500'}">✓</div>
-          <h3 class="font-display text-3xl font-bold mt-4">Vote locked!</h3>
+          <h3 class="font-display text-3xl font-semibold mt-4">Vote locked!</h3>
           <p class="text-lg mt-1">Your table voted <b class="${mine === 'yes' ? 'text-emerald-600' : 'text-rose-600'}">${mine === 'yes' ? 'YES' : 'NO'}</b></p>
           <p class="text-slate-500 mt-3">Waiting for results<span class="dot-a">.</span><span class="dot-b">.</span><span class="dot-c">.</span></p>
-          <p class="text-xs mt-2 ${acked === s.voteId ? 'text-emerald-600' : 'text-amber-600'}">${acked === s.voteId || transport.mode === 'local' ? '✓ Received' : 'Sending…'}</p></div></div>`;
+          <p class="text-xs mt-2 ${acked === s.voteId ? 'text-emerald-600' : 'text-amber-600'}">${acked === s.voteId ? '✓ Received' : 'Sending…'}</p></div></div>`;
       } else if (over) {
-        action = `<div class="card p-6 text-center flex-1 grid place-items-center"><div><div class="text-5xl mb-2">⏱️</div><h3 class="font-display text-2xl font-bold">Time’s up</h3><p class="text-slate-500 mt-1">Counting the votes…</p></div></div>`;
+        action = `<div class="card p-6 text-center flex-1 grid place-items-center"><div><div class="text-5xl mb-2">⏱️</div><h3 class="font-display text-2xl font-semibold">Time’s up</h3><p class="text-slate-500 mt-1">Counting the votes…</p></div></div>`;
       } else {
         action = `<div class="grid grid-cols-2 gap-4 flex-1 min-h-[42vh]">
           <button data-act="yes" class="vote-btn bg-emerald-500 text-4xl md:text-6xl"><span class="text-6xl md:text-8xl leading-none">👍</span>YES<span class="text-sm md:text-lg font-semibold opacity-90">Fund it</span></button>
           <button data-act="no" class="vote-btn bg-rose-500 text-4xl md:text-6xl"><span class="text-6xl md:text-8xl leading-none">👎</span>NO<span class="text-sm md:text-lg font-semibold opacity-90">Pass on it</span></button></div>`;
       }
-      return `<div class="card p-5 pop">${itemHeader(it, false)}
+      return `<div class="card p-5 pop">${itemHeader(it)}
           <div class="grid grid-cols-2 gap-3 mt-4">
             <div class="rounded-2xl bg-slate-100 p-3"><div class="text-xs font-semibold text-slate-500">Cost</div><div class="num text-2xl font-bold">${fmt(it.cost)}</div><div class="text-xs text-slate-500">${pct}% of what’s left</div></div>
             <div class="rounded-2xl ${after < 0 ? 'bg-amber-50' : 'bg-emerald-50'} p-3"><div class="text-xs font-semibold text-slate-500">Left if approved</div><div class="num text-2xl font-bold ${after < 0 ? 'text-amber-600' : 'text-emerald-600'}">${after < 0 ? 'Over budget' : fmt(after)}</div></div>
@@ -1191,51 +1242,49 @@ async function showTable(code, name) {
         ${action}`;
     }
 
-    if (s.phase === 'result' && s.result) {
+    if ((s.phase === 'result' || s.phase === 'placing') && s.result) {
       const r = s.result;
       return `<div class="rounded-[2rem] overflow-hidden pop ${r.passed ? 'bg-emerald-500' : 'bg-rose-500'} text-white p-6 text-center shadow-2xl">
           <div class="text-6xl">${r.passed ? '🎉' : '✋'}</div>
-          <div class="font-display text-4xl md:text-5xl font-bold mt-1">${r.passed ? 'Passed!' : 'Did not pass'}</div>
+          <div class="font-display text-4xl md:text-5xl font-semibold mt-1">${r.passed ? 'Passed!' : 'Did not pass'}</div>
           <div class="font-semibold opacity-95 mt-1">${esc(r.reason)}</div></div>
-        <div class="card p-5 pop">${itemHeader(r, false)}
+        <div class="card p-5 pop">${itemHeader(r)}
           <div class="grid grid-cols-2 gap-3 mt-4">
             <div class="rounded-2xl bg-emerald-50 p-3 text-center"><div class="text-xs font-bold text-emerald-700">Yes</div><div class="num text-4xl font-bold text-emerald-600">${r.yes}</div></div>
             <div class="rounded-2xl bg-rose-50 p-3 text-center"><div class="text-xs font-bold text-rose-700">No</div><div class="num text-4xl font-bold text-rose-600">${r.no}</div></div></div>
-          <div class="text-sm text-slate-500 mt-3 text-center">${mine ? `Your table voted <b class="${mine === 'yes' ? 'text-emerald-600' : 'text-rose-600'}">${mine.toUpperCase()}</b>` : 'Your table didn’t vote on this one'} · ${r.passed ? `${fmt(r.cost)} added to the city` : 'Budget unchanged'}</div></div>
+          <div class="text-sm text-slate-500 mt-3 text-center">${mine ? `Your table voted <b class="${mine === 'yes' ? 'text-emerald-600' : 'text-rose-600'}">${mine.toUpperCase()}</b>` : 'Your table didn’t vote on this one'} · ${r.passed ? `${fmt(r.cost)} spent` : 'Budget unchanged'}</div>
+          ${s.phase === 'placing' ? '<div class="text-sm font-semibold text-emerald-700 mt-2 text-center">The host is choosing where it goes in the city…</div>' : ''}</div>
         ${budgetCard()}`;
     }
 
     if (s.phase === 'finished') {
-      return `<div class="card p-6 text-center pop"><div class="text-6xl">🏆</div><h2 class="font-display text-3xl font-bold mt-2">Session complete</h2>
-        <p class="text-slate-500 mt-1">${s.placed.length} ${s.placed.length === 1 ? 'project was' : 'projects were'} funded, and ${fmt(remaining(s))} is left.</p></div>${budgetCard()}`;
+      return `<div class="card p-6 text-center pop"><div class="text-6xl">🏆</div><h2 class="font-display text-3xl font-semibold mt-2">Session complete</h2>
+        <p class="text-slate-500 mt-1">${builtItems(s).length} ${builtItems(s).length === 1 ? 'project was' : 'projects were'} funded, and ${fmt(remaining(s))} is left.</p></div>${budgetCard()}`;
     }
 
-    // idle
     const last = s.result && s.decisions.length
       ? `<div class="panel p-4 flex items-center gap-3"><span class="text-2xl">${s.result.passed ? '✅' : '❌'}</span><div class="min-w-0"><div class="text-xs font-semibold text-slate-300">Last decision</div><div class="font-semibold text-white truncate">${esc(s.result.name)} ${s.result.passed ? 'passed' : 'did not pass'} (${s.result.yes}–${s.result.no})</div></div></div>` : '';
     return `${budgetCard()}
-      <div class="card p-6 text-center pop"><div class="text-5xl mb-2">⏳</div><h2 class="font-display text-2xl font-bold">Waiting for the next vote</h2>
+      <div class="card p-6 text-center pop"><div class="text-5xl mb-2">⏳</div><h2 class="font-display text-2xl font-semibold">Waiting for the next vote</h2>
         <p class="text-slate-500 mt-1">Keep this screen open. It updates the moment the host starts.</p>
         ${it ? `<div class="mt-4 rounded-2xl bg-slate-100 p-3 flex items-center gap-3 text-left"><span class="text-3xl">${iconHTML(it.icon)}</span><div class="min-w-0"><div class="text-xs font-semibold text-slate-500">Up next</div><div class="font-bold truncate">${esc(it.name)}</div></div><div class="num font-bold ml-auto">${fmtShort(it.cost)}</div></div>` : ''}</div>${last}`;
   }
 
   function render() {
-    if (!state) { setHTML(root, `<div class="min-h-screen grid place-items-center p-6 text-center"><div><div class="text-5xl mb-3">👋</div><div class="text-slate-700 font-display text-2xl font-bold">The host closed this session</div><button data-act="leave" class="btn btn-green mt-5">Back to home</button></div></div>`); return; }
+    if (!state) { setHTML(root, `<div class="min-h-screen grid place-items-center p-6 text-center"><div><div class="text-5xl mb-3">👋</div><div class="text-slate-700 font-display text-2xl font-semibold">The host closed this session</div><button data-act="leave" class="btn btn-green mt-5">Back to home</button></div></div>`); return; }
     setHTML(root, `<div class="min-h-screen flex flex-col max-w-xl md:max-w-2xl mx-auto w-full">${header()}<main class="flex-1 flex flex-col gap-4 px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))]">${body()}${cityStrip()}</main></div>`);
     tick();
   }
-
   function tick() {
     if (!state) return;
     if (state.phase === 'voting') {
       const left = Math.max(0, state.endsAt - transport.now()), sec = Math.ceil(left / 1000);
-      const t = $('#tTime'); if (t) { t.textContent = sec; t.style.color = sec <= 10 ? '#e11d48' : ''; }
+      const t = $('#tTime'); if (t) { t.textContent = sec; t.style.color = sec <= 10 ? '#b02229' : ''; }
       const b = $('#tBar'); if (b) { b.style.width = (left / (state.durationMs || 1) * 100) + '%'; b.className = 'h-full rounded-full ' + (sec <= 10 ? 'bg-rose-500' : 'bg-emerald-500'); }
       const over = left <= 0; if (over !== wasOver) { wasOver = over; render(); }
     } else wasOver = false;
     const on = hostOnline(); if (on !== lastHostOn) { lastHostOn = on; render(); }
   }
-
   async function cast(choice) {
     if (!state || state.phase !== 'voting' || myVote() || transport.now() >= state.endsAt) return;
     const vid = state.voteId;
