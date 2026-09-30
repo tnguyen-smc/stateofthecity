@@ -51,6 +51,8 @@
       radial-gradient(circle at 100% 0%, rgba(41,171,226,.10), transparent 38%),
       radial-gradient(circle at 94% 108%, rgba(123,63,152,.09), transparent 40%);
   }
+  .fit-big { white-space: nowrap; font-size: clamp(1.6rem, 8.5vw, 3rem); line-height: 1.1; }
+  .fit-num { white-space: nowrap; font-size: clamp(1.15rem, 6vw, 1.75rem); line-height: 1.15; }
   .num { font-family: Montserrat, system-ui, sans-serif; font-variant-numeric: tabular-nums; letter-spacing: -.03em; }
   .wordmark { font-weight: 300; letter-spacing: .16em; text-transform: uppercase; line-height: 1.1; }
   .card { background: #fff; color: #38393b; border-radius: 1.25rem; border: 1px solid #e6e7e2; box-shadow: 0 14px 34px -22px rgba(56,57,59,.45); }
@@ -348,7 +350,6 @@ function freeSlots(s) {
   }
   return arr.sort((a, b) => a[0] - b[0]).map(x => x[1]);
 }
-const cityTier = n => ['Hamlet', 'Village', 'Town', 'City', 'Metropolis'][Math.min(4, Math.floor(n / 3))];
 const advanceAfter = s => { s.pending = null; s.idx++; s.phase = s.idx >= s.queue.length ? 'finished' : 'idle'; };
 
 /* ════════════════════════════════════════════════════════════════════════════
@@ -422,7 +423,6 @@ function showHostLanding(notice) {
    ════════════════════════════════════════════════════════════════════════════ */
 function showJoinPage(notice) {
   cleanup();
-  const lastTable = store.get('civic:lastTable', { code: '', name: '' });
   app.innerHTML = `
   <div class="min-h-screen bg-grid flex flex-col">
     <main class="flex-1 grid place-items-center px-4 py-8">
@@ -434,9 +434,9 @@ function showJoinPage(notice) {
           <p class="text-slate-500 mt-2 leading-relaxed">Enter the room code from the main screen and name your table. Each table gets one vote per item.</p>
           <div class="mt-6 space-y-4">
             <div><label class="lbl" for="jCode">Room code</label>
-              <input id="jCode" class="field num !text-3xl !font-bold tracking-[.35em] uppercase text-center" maxlength="6" autocomplete="off" autocapitalize="characters" placeholder="ABCD" value="${esc(URL_CODE || lastTable.code)}"></div>
+              <input id="jCode" class="field num !text-3xl !font-bold tracking-[.35em] uppercase text-center" maxlength="6" autocomplete="off" autocapitalize="characters" placeholder="ABCD" value="${esc(URL_CODE)}"></div>
             <div><label class="lbl" for="jName">Table name</label>
-              <input id="jName" class="field" maxlength="24" placeholder="Table 1" value="${esc(lastTable.name)}"></div>
+              <input id="jName" class="field" maxlength="24" autocomplete="off" placeholder="Table 1"></div>
           </div>
           <button data-act="join" class="btn btn-dark w-full !text-lg !py-4 mt-6">Join as table</button>
         </section>
@@ -455,7 +455,7 @@ function showJoinPage(notice) {
   const onKey = e => { if (e.key === 'Enter' && /INPUT/.test(e.target.tagName)) join(); };
   app.addEventListener('click', onClick); document.addEventListener('keydown', onKey);
   teardown.push(() => { app.removeEventListener('click', onClick); document.removeEventListener('keydown', onKey); });
-  if (URL_CODE && !lastTable.name) setTimeout(() => $('#jName')?.focus(), 50);
+  if (URL_CODE) setTimeout(() => $('#jName')?.focus(), 50);
 }
 
 /* ════════════════════════════════════════════════════════════════════════════
@@ -725,10 +725,10 @@ async function showHost(code, initial, isNew) {
       <section class="lg:col-span-5 flex flex-col gap-4 min-h-0 lg:overflow-y-auto pr-0.5">
         <div class="card p-5 xl:p-6 shrink-0">
           <div class="flex items-center justify-between"><div class="text-sm font-semibold text-slate-500">Remaining budget</div><div id="bStats" class="text-xs font-semibold text-slate-400"></div></div>
-          <div id="bRem" class="num text-5xl xl:text-7xl font-bold text-emerald-600 leading-tight">$0</div>
+          <div id="bRem" class="num text-[clamp(2rem,9vw,3.25rem)] xl:text-7xl whitespace-nowrap font-bold text-emerald-600 leading-tight">$0</div>
           <div class="h-3 rounded-full bg-rose-100 overflow-hidden mt-2"><div id="bBar" class="h-full bg-emerald-500 transition-all duration-700" style="width:100%"></div></div>
           <div class="flex items-end justify-between mt-3">
-            <div><div class="text-xs font-semibold text-slate-500">Total spent</div><div id="bSpent" class="num text-2xl xl:text-3xl font-bold text-rose-600">$0</div></div>
+            <div><div class="text-xs font-semibold text-slate-500">Total spent</div><div id="bSpent" class="num text-[clamp(1.25rem,6vw,1.75rem)] xl:text-3xl whitespace-nowrap font-bold text-rose-600">$0</div></div>
             <div class="text-right"><div class="text-xs font-semibold text-slate-500">Starting budget</div><div id="bStart" class="num text-lg xl:text-xl font-semibold text-slate-700"></div></div>
           </div>
         </div>
@@ -868,7 +868,7 @@ async function showHost(code, initial, isNew) {
     setMoney($('#bRem'), rem); setMoney($('#bSpent'), state.spent); $('#bStart').textContent = fmt(state.startingBudget);
     $('#bBar').style.width = pct + '%';
     $('#bBar').className = 'h-full transition-all duration-700 ' + (pct < 15 ? 'bg-amber-500' : 'bg-emerald-500');
-    $('#bRem').className = 'num text-5xl xl:text-7xl font-bold leading-tight ' + (rem <= 0 ? 'text-rose-600' : 'text-emerald-600');
+    $('#bRem').className = 'num text-[clamp(2rem,9vw,3.25rem)] xl:text-7xl whitespace-nowrap font-bold leading-tight ' + (rem <= 0 ? 'text-rose-600' : 'text-emerald-600');
     const ok = state.decisions.filter(d => d.passed).length, no = state.decisions.length - ok;
     $('#bStats').textContent = `${ok} funded · ${no} rejected`;
   }
@@ -979,7 +979,7 @@ async function showHost(code, initial, isNew) {
     }
     const built = builtItems(state), n = built.length;
     $('#cTitle').textContent = state.title; document.title = state.title + ' · Our City';
-    $('#cSub').textContent = `${cityTier(n)} · ${n === 0 ? 'nothing built yet. Every approved project lands here.' : n + ' ' + (n === 1 ? 'project' : 'projects') + ' built'}`;
+    $('#cSub').textContent = n === 0 ? 'Nothing built yet. Every approved project lands here.' : n + ' ' + (n === 1 ? 'project' : 'projects') + ' built';
     setHTML($('#cStats'), `<span class="chip bg-emerald-50 text-emerald-700 border-emerald-200 !text-sm">${fmt(state.spent)} invested</span>`);
     const counts = {}; built.forEach(p => counts[p.category] = (counts[p.category] || 0) + 1);
     setHTML($('#cLegend'), Object.entries(counts).map(([k, v]) => `<span class="chip !text-xs" style="background:${catColor(k)}22;color:#38393b;border-color:${catColor(k)}88"><span class="w-2 h-2 rounded-full" style="background:${catColor(k)}"></span>${esc(k)} ${v}</span>`).join(''));
@@ -1033,7 +1033,7 @@ async function showHost(code, initial, isNew) {
     return `<div class="fixed inset-0 z-[70] grid place-items-center p-4 md:p-8 bg-slate-950/80 backdrop-blur-md fade-in">
       <div class="pop w-[min(96vw,900px)] max-h-[92vh] overflow-auto rounded-[2rem] bg-white text-slate-900 shadow-2xl p-6 md:p-10">
         <div class="text-center"><div class="text-6xl">🎉</div><h2 class="wordmark text-2xl md:text-4xl text-slate-600 mt-3">${esc(state.title)}</h2>
-          <p class="text-slate-500 mt-3">${cityTier(ok.length)} with ${ok.length} ${ok.length === 1 ? 'project' : 'projects'} funded.</p></div>
+          <p class="text-slate-500 mt-3">${ok.length} ${ok.length === 1 ? 'project' : 'projects'} funded.</p></div>
         <div class="grid grid-cols-3 gap-3 md:gap-5 mt-7">
           <div class="rounded-2xl bg-emerald-50 p-4 text-center"><div class="text-xs font-bold text-emerald-700">Left in budget</div><div class="num text-xl md:text-4xl font-bold text-emerald-600 mt-1">${fmt(remaining(state))}</div></div>
           <div class="rounded-2xl bg-rose-50 p-4 text-center"><div class="text-xs font-bold text-rose-700">Spent</div><div class="num text-xl md:text-4xl font-bold text-rose-600 mt-1">${fmt(state.spent)}</div></div>
@@ -1162,7 +1162,6 @@ async function showTable(code, name) {
   try { state = normalizeState(await timeout(transport.get('state'), 9000)); }
   catch { showLanding('Could not reach the room. Check your connection and try again.'); return; }
   if (!state) { showLanding(`Room ${code} wasn’t found. Check the code on the main screen.`); return; }
-  store.set('civic:lastTable', { code, name });
   const tid = slug(name);
   const lockKey = vid => `civic:vote:${code}:${vid}:${tid}`;
   let hostSeen = 0, connected = true, remoteVote = null, voteKey = null, unsubMine = null, acked = null, wasOver = false, lastHostOn = null;
@@ -1194,11 +1193,10 @@ async function showTable(code, name) {
   function budgetCard() {
     const rem = remaining(state), pct = Math.max(0, Math.min(100, rem / state.startingBudget * 100));
     return `<div class="card p-5">
-      <div class="flex justify-between items-end gap-3">
-        <div><div class="text-xs font-semibold text-slate-500">City budget remaining</div><div class="num text-4xl md:text-5xl font-bold ${rem <= 0 ? 'text-rose-600' : 'text-emerald-600'}">${fmt(rem)}</div></div>
-        <div class="text-right"><div class="text-xs font-semibold text-slate-500">Spent</div><div class="num text-xl font-bold text-rose-600">${fmt(state.spent)}</div></div>
-      </div>
-      <div class="h-2.5 rounded-full bg-rose-100 overflow-hidden mt-3"><div class="h-full ${pct < 15 ? 'bg-amber-500' : 'bg-emerald-500'}" style="width:${pct}%"></div></div></div>`;
+      <div class="text-xs font-semibold text-slate-500">City budget remaining</div>
+      <div class="num fit-big font-bold ${rem <= 0 ? 'text-rose-600' : 'text-emerald-600'}">${fmt(rem)}</div>
+      <div class="h-2.5 rounded-full bg-rose-100 overflow-hidden mt-3"><div class="h-full ${pct < 15 ? 'bg-amber-500' : 'bg-emerald-500'}" style="width:${pct}%"></div></div>
+      <div class="flex justify-between items-baseline gap-3 mt-2 text-sm"><span class="font-semibold text-slate-500">Spent</span><span class="num fit-num !text-lg font-bold text-rose-600">${fmt(state.spent)}</span></div></div>`;
   }
   function itemHeader(it) {
     const c = catColor(it.category);
@@ -1234,9 +1232,9 @@ async function showTable(code, name) {
           <button data-act="no" class="vote-btn bg-rose-500 text-4xl md:text-6xl"><span class="text-6xl md:text-8xl leading-none">👎</span>NO<span class="text-sm md:text-lg font-semibold opacity-90">Pass on it</span></button></div>`;
       }
       return `<div class="card p-5 pop">${itemHeader(it)}
-          <div class="grid grid-cols-2 gap-3 mt-4">
-            <div class="rounded-2xl bg-slate-100 p-3"><div class="text-xs font-semibold text-slate-500">Cost</div><div class="num text-2xl font-bold">${fmt(it.cost)}</div><div class="text-xs text-slate-500">${pct}% of what’s left</div></div>
-            <div class="rounded-2xl ${after < 0 ? 'bg-amber-50' : 'bg-emerald-50'} p-3"><div class="text-xs font-semibold text-slate-500">Left if approved</div><div class="num text-2xl font-bold ${after < 0 ? 'text-amber-600' : 'text-emerald-600'}">${after < 0 ? 'Over budget' : fmt(after)}</div></div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
+            <div class="rounded-2xl bg-slate-100 p-3"><div class="text-xs font-semibold text-slate-500">Cost</div><div class="num fit-num font-bold">${fmt(it.cost)}</div><div class="text-xs text-slate-500">${pct}% of what’s left</div></div>
+            <div class="rounded-2xl ${after < 0 ? 'bg-amber-50' : 'bg-emerald-50'} p-3"><div class="text-xs font-semibold text-slate-500">Left if approved</div><div class="num fit-num font-bold ${after < 0 ? 'text-amber-600' : 'text-emerald-600'}">${after < 0 ? 'Over budget' : fmt(after)}</div></div>
           </div>
           <div class="flex items-center gap-3 mt-4"><div class="num text-2xl font-bold w-12" id="tTime">--</div><div class="flex-1 h-3 rounded-full bg-slate-200 overflow-hidden"><div id="tBar" class="h-full rounded-full bg-emerald-500" style="width:100%"></div></div></div></div>
         ${action}`;
