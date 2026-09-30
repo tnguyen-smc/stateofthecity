@@ -1,0 +1,1245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b1120">
+<title>CityBudget Live – Municipal Budgeting Simulation</title>
+
+<!--
+  ┌──────────────────────────────────────────────────────────────────────────┐
+  │ CityBudget Live — single-file app (no build step)                         │
+  │                                                                          │
+  │ DEPLOY:  save as index.html → push to GitHub → GitHub Pages / Cloudflare │
+  │          Pages (build command: none, output dir: /).                     │
+  │                                                                          │
+  │ SYNC:    Works out of the box in "Local demo mode" (tabs in one browser).│
+  │          For real multi-device play, connect a free Firebase Realtime    │
+  │          Database: either paste its URL in the app (⚙ Sync settings) or  │
+  │          hard-code it in FIREBASE_CONFIG below so every device has it.   │
+  └──────────────────────────────────────────────────────────────────────────┘
+-->
+
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<script>
+  tailwind.config = {
+    theme: { extend: { fontFamily: {
+      display: ['"Space Grotesk"', 'Inter', 'system-ui', 'sans-serif'],
+      sans: ['Inter', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif']
+    } } }
+  };
+</script>
+
+<style>
+  html, body { height: 100%; }
+  body {
+    font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
+    background: #0b1120; color: #e2e8f0;
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior-y: none;
+  }
+  .bg-grid {
+    background-color: #0b1120;
+    background-image:
+      radial-gradient(circle at 12% -10%, rgba(16,185,129,.16), transparent 42%),
+      radial-gradient(circle at 100% 110%, rgba(56,189,248,.12), transparent 40%);
+  }
+  .num { font-family: 'Space Grotesk', Inter, system-ui, sans-serif; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+  .card { background: #fff; color: #0f172a; border-radius: 1.5rem; box-shadow: 0 18px 40px -18px rgba(0,0,0,.55); }
+  .panel { background: rgba(15,23,42,.72); border: 1px solid rgba(148,163,184,.14); border-radius: 1.5rem; backdrop-filter: blur(6px); }
+  .chip { display:inline-flex; align-items:center; gap:.35rem; padding:.15rem .6rem; border-radius:999px; font-size:.72rem; font-weight:700; border:1px solid transparent; }
+  .field { width:100%; border:1.5px solid #cbd5e1; border-radius:.75rem; padding:.6rem .8rem; font-size:.95rem; background:#fff; color:#0f172a; outline:none; }
+  .field:focus { border-color:#10b981; box-shadow:0 0 0 3px rgba(16,185,129,.2); }
+  .lbl { display:block; font-size:.78rem; font-weight:700; color:#475569; margin-bottom:.3rem; }
+  .btn { display:inline-flex; align-items:center; justify-content:center; gap:.5rem; font-weight:700; border-radius:.85rem; padding:.65rem 1.1rem; transition: transform .08s, filter .15s, background .15s; cursor:pointer; }
+  .btn:active { transform: scale(.97); }
+  .btn:disabled { opacity:.45; cursor:not-allowed; }
+  .btn-green { background:#10b981; color:#04261b; } .btn-green:hover:not(:disabled){ filter:brightness(1.08); }
+  .btn-dark { background:#0f172a; color:#fff; } .btn-dark:hover:not(:disabled){ background:#1e293b; }
+  .btn-ghost { background:rgba(148,163,184,.14); color:#e2e8f0; } .btn-ghost:hover:not(:disabled){ background:rgba(148,163,184,.26); }
+  .btn-light { background:#f1f5f9; color:#0f172a; } .btn-light:hover:not(:disabled){ background:#e2e8f0; }
+  .btn-red { background:#f43f5e; color:#fff; }
+  :focus-visible { outline: 3px solid #34d399; outline-offset: 2px; }
+
+  /* ---- Imaginary city ---- */
+  .city-grid { display:grid; gap:10px; padding:14px; height:100%; min-height:340px; border-radius:1.25rem;
+    background-color:#0a1020;
+    background-image: radial-gradient(rgba(148,163,184,.10) 1px, transparent 1px);
+    background-size: 18px 18px;
+    border:1px solid rgba(148,163,184,.12); }
+  .lot { border-radius:14px; border:1.5px dashed rgba(148,163,184,.16); background: rgba(148,163,184,.03); }
+  .tile { position:relative; min-width:0; min-height:0; border-radius:14px; border:1.5px solid var(--cb);
+    background: linear-gradient(160deg, var(--c1), var(--c2)); display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:.25rem; padding:.35rem; text-align:center; overflow:hidden; box-shadow: 0 10px 22px -12px var(--cb); }
+  .tile-icon { font-size: clamp(1.5rem, 3.3vw, 3.8rem); line-height:1; }
+  .tile-name { font-size: clamp(.6rem, .85vw, .95rem); font-weight:700; color:#f1f5f9; line-height:1.15; max-width:100%; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
+  .tile-cost { font-size: clamp(.55rem,.75vw,.85rem); font-weight:700; color:#6ee7b7; }
+  .tile-tag { font-size:.6rem; font-weight:700; color:#94a3b8; }
+  .tile-base { filter: saturate(.35) brightness(.85); }
+  .ico-img { width:1em; height:1em; object-fit:contain; border-radius:.2em; display:block; }
+
+  /* ---- Motion ---- */
+  @keyframes drop { 0%{transform:translateY(-140px) scale(1.3);opacity:0} 55%{transform:translateY(8px) scale(.97);opacity:1} 75%{transform:translateY(-7px) scale(1.02)} 100%{transform:none;opacity:1} }
+  @keyframes ring { 0%{box-shadow:0 0 0 0 rgba(52,211,153,.85)} 100%{box-shadow:0 0 0 34px rgba(52,211,153,0)} }
+  .tile-new { animation: drop .95s cubic-bezier(.2,.8,.2,1) both, ring 1.5s .55s ease-out; z-index:2; }
+  @keyframes pop { 0%{transform:scale(.88);opacity:0} 100%{transform:scale(1);opacity:1} }
+  .pop { animation: pop .35s cubic-bezier(.2,1.2,.3,1) both; }
+  @keyframes fadeIn { from{opacity:0} to{opacity:1} }
+  .fade-in { animation: fadeIn .25s ease both; }
+  @keyframes grow { from{width:0} to{width:var(--w)} }
+  .grow { animation: grow 1.1s .25s cubic-bezier(.2,.8,.2,1) both; }
+  @keyframes drain { from{width:100%} to{width:0} }
+  .drain { animation: drain linear forwards; }
+  @keyframes confetti { to { transform: translate(var(--dx), 110vh) rotate(var(--rot)); opacity:1 } }
+  @keyframes glow { 0%,100%{box-shadow:0 0 0 0 rgba(52,211,153,.0)} 50%{box-shadow:0 0 0 8px rgba(52,211,153,.25)} }
+  .glow { animation: glow 1.6s ease-in-out infinite; }
+  @keyframes dots { 0%,20%{opacity:.2} 50%{opacity:1} 100%{opacity:.2} }
+  .dot-a { animation: dots 1.4s infinite; } .dot-b { animation: dots 1.4s .2s infinite; } .dot-c { animation: dots 1.4s .4s infinite; }
+  @keyframes checkPop { 0%{transform:scale(0) rotate(-30deg)} 70%{transform:scale(1.15) rotate(6deg)} 100%{transform:scale(1) rotate(0)} }
+  .check-pop { animation: checkPop .5s cubic-bezier(.2,1.3,.3,1) both; }
+  .vote-btn { border-radius: 1.75rem; font-weight: 800; color:#fff; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:.25rem;
+    border-bottom: 10px solid rgba(0,0,0,.25); transition: transform .08s, border-width .08s, filter .15s; touch-action: manipulation; user-select:none; }
+  .vote-btn:active:not(:disabled) { transform: translateY(6px); border-bottom-width: 4px; }
+  .vote-btn:disabled { filter: grayscale(.8) brightness(.8); }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: .01ms !important; animation-delay: 0ms !important; transition-duration: .01ms !important; }
+  }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<noscript><p style="padding:2rem;color:#fff">This app needs JavaScript.</p></noscript>
+
+<script>
+'use strict';
+
+/* ════════════════════════════════════════════════════════════════════════════
+   CONFIG
+   ════════════════════════════════════════════════════════════════════════════ */
+// Optional: hard-code your Firebase Realtime Database URL so every device uses it automatically.
+// Example: { databaseURL: 'https://my-project-default-rtdb.firebaseio.com' }
+const FIREBASE_CONFIG = null;
+
+const COLS = 6;
+const HEARTBEAT_MS = 5000;
+const STALE_MS = 16000;
+
+const CATS = {
+  'Transportation':     { color: '#38bdf8', icon: '🚌' },
+  'Public Safety':      { color: '#f87171', icon: '🚒' },
+  'Parks & Recreation': { color: '#4ade80', icon: '🌳' },
+  'Education':          { color: '#fbbf24', icon: '📚' },
+  'Health':             { color: '#f472b6', icon: '🏥' },
+  'Utilities':          { color: '#22d3ee', icon: '🚰' },
+  'Housing':            { color: '#a78bfa', icon: '🏢' },
+  'Culture':            { color: '#fb923c', icon: '🎭' },
+  'Economy':            { color: '#2dd4bf', icon: '💼' },
+  'Other':              { color: '#94a3b8', icon: '📦' }
+};
+const catColor = c => (CATS[c] || CATS.Other).color;
+
+const PRESETS = [
+  { id: 'p_brt',   name: 'Bus Rapid Transit Line',       cost: 2400000, category: 'Transportation',     icon: '🚌', def: true },
+  { id: 'p_bike',  name: 'Protected Bike Lanes',         cost: 800000,  category: 'Transportation',     icon: '🚲', def: true },
+  { id: 'p_bridge',name: 'Bridge Repair & Rehab',        cost: 3200000, category: 'Transportation',     icon: '🌉', def: true },
+  { id: 'p_sig',   name: 'Smart Traffic Signals',        cost: 1100000, category: 'Transportation',     icon: '🚦' },
+  { id: 'p_fire',  name: 'New Fire Station',             cost: 2800000, category: 'Public Safety',      icon: '🚒', def: true },
+  { id: 'p_disp',  name: 'Emergency Dispatch Upgrade',   cost: 900000,  category: 'Public Safety',      icon: '🚨' },
+  { id: 'p_park',  name: 'Riverfront Park',              cost: 1800000, category: 'Parks & Recreation', icon: '🌳', def: true },
+  { id: 'p_pool',  name: 'Community Pool',               cost: 2200000, category: 'Parks & Recreation', icon: '🏊', def: true },
+  { id: 'p_play',  name: 'Playground Renovations',       cost: 500000,  category: 'Parks & Recreation', icon: '🛝', def: true },
+  { id: 'p_lib',   name: 'Library Expansion',            cost: 1600000, category: 'Education',          icon: '📚', def: true },
+  { id: 'p_after', name: 'After-School Learning Center', cost: 700000,  category: 'Education',          icon: '🎒' },
+  { id: 'p_clinic',name: 'Community Health Clinic',      cost: 2000000, category: 'Health',             icon: '🏥', def: true },
+  { id: 'p_water', name: 'Water Main Replacement',       cost: 2600000, category: 'Utilities',          icon: '🚰', def: true },
+  { id: 'p_solar', name: 'Solar on City Buildings',      cost: 1400000, category: 'Utilities',          icon: '☀️', def: true },
+  { id: 'p_fiber', name: 'Public Broadband Network',     cost: 1900000, category: 'Utilities',          icon: '📡' },
+  { id: 'p_house', name: 'Affordable Housing Complex',   cost: 3500000, category: 'Housing',            icon: '🏢', def: true },
+  { id: 'p_arts',  name: 'Arts & Performance Center',    cost: 1700000, category: 'Culture',            icon: '🎭' },
+  { id: 'p_biz',   name: 'Small Business Incubator',     cost: 1000000, category: 'Economy',            icon: '💼' }
+];
+const EMOJIS = ['🚌','🚲','🌉','🚦','🚆','🛣️','🚒','🚓','🚨','🌳','🏊','🛝','🏟️','📚','🏫','🏥','🚰','☀️','⚡','📡','♻️','🏢','🏡','🎭','🎨','💼','🛒','🏗️','🐕','🌷'];
+
+/* ════════════════════════════════════════════════════════════════════════════
+   UTILITIES
+   ════════════════════════════════════════════════════════════════════════════ */
+const $  = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+const fmt = n => (n < 0 ? '-$' : '$') + Math.round(Math.abs(n)).toLocaleString('en-US');
+const fmtShort = n => {
+  const a = Math.abs(n);
+  if (a >= 1e6) return '$' + (n / 1e6).toFixed(n % 1e6 === 0 ? 0 : 1) + 'M';
+  if (a >= 1e3) return '$' + Math.round(n / 1e3) + 'K';
+  return '$' + n;
+};
+const uid = () => Math.random().toString(36).slice(2, 9);
+const genCode = () => { const a = 'ABCDEFGHJKMNPQRSTUVWXYZ'; let c = ''; for (let i = 0; i < 4; i++) c += a[Math.floor(Math.random() * a.length)]; return c; };
+const slug = s => String(s).toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'table';
+const timeout = (p, ms) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), ms))]);
+const toArr = v => Array.isArray(v) ? v.filter(Boolean) : (v && typeof v === 'object') ? Object.keys(v).sort((a, b) => a - b).map(k => v[k]) : [];
+const hash = str => { let h = 5381; for (let i = 0; i < str.length; i++) h = ((h << 5) + h + str.charCodeAt(i)) | 0; return Math.abs(h); };
+const natSort = (a, b) => a.name.localeCompare(b.name, undefined, { numeric: true });
+
+const mem = {};
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return k in mem ? mem[k] : d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { mem[k] = v; } },
+  del(k) { try { localStorage.removeItem(k); } catch { delete mem[k]; } }
+};
+
+function iconHTML(icon) {
+  const s = String(icon || '📦');
+  if (/^(https?:\/\/|data:image\/)/i.test(s))
+    return `<img class="ico-img" src="${esc(s)}" alt="" referrerpolicy="no-referrer" onerror="this.replaceWith(document.createTextNode('📦'))">`;
+  return `<span>${esc(s)}</span>`;
+}
+
+function setHTML(el, html) { if (el && el._h !== html) { el._h = html; el.innerHTML = html; } }
+
+function toast(msg, kind = 'info') {
+  const t = document.createElement('div');
+  t.className = 'fixed left-1/2 -translate-x-1/2 bottom-6 z-[100] px-5 py-3 rounded-xl text-sm font-semibold shadow-2xl pop max-w-[92vw] text-center ' +
+    (kind === 'error' ? 'bg-rose-600 text-white' : 'bg-slate-900 text-white border border-white/10');
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 4200);
+}
+
+function loadScript(src) {
+  return new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = src; s.onload = res; s.onerror = () => rej(new Error('Could not load ' + src));
+    document.head.appendChild(s);
+  });
+}
+
+function setMoney(el, val) {
+  if (!el) return;
+  if (el._v === undefined) { el._v = val; el.textContent = fmt(val); return; }
+  if (el._v === val) return;
+  const from = el._v, to = val; el._v = val;
+  const t0 = performance.now(); cancelAnimationFrame(el._raf);
+  const step = t => {
+    const p = Math.min(1, (t - t0) / 800), e = 1 - Math.pow(1 - p, 3);
+    el.textContent = fmt(from + (to - from) * e);
+    if (p < 1) el._raf = requestAnimationFrame(step);
+  };
+  el._raf = requestAnimationFrame(step);
+}
+
+/* Sound + confetti (host only) */
+let soundOn = store.get('civic:sound', true);
+let actx = null;
+function beep(freq = 660, dur = .12, type = 'sine', vol = .08) {
+  if (!soundOn) return;
+  try {
+    actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+    const o = actx.createOscillator(), g = actx.createGain();
+    o.type = type; o.frequency.value = freq; g.gain.value = vol;
+    o.connect(g); g.connect(actx.destination); o.start();
+    g.gain.exponentialRampToValueAtTime(.0001, actx.currentTime + dur); o.stop(actx.currentTime + dur);
+  } catch {}
+}
+function chime(ok) {
+  (ok ? [523, 659, 784, 1046] : [330, 262]).forEach((f, i) => setTimeout(() => beep(f, .28, ok ? 'triangle' : 'sawtooth', ok ? .1 : .05), i * 130));
+}
+function confetti(n = 80) {
+  const colors = ['#34d399', '#38bdf8', '#fbbf24', '#f472b6', '#a78bfa', '#fb923c'];
+  const box = document.createElement('div');
+  box.className = 'fixed inset-0 pointer-events-none z-[90] overflow-hidden';
+  for (let i = 0; i < n; i++) {
+    const p = document.createElement('i');
+    p.style.cssText = `position:absolute;top:-24px;left:${Math.random() * 100}%;width:${6 + Math.random() * 8}px;height:${10 + Math.random() * 10}px;` +
+      `background:${colors[i % colors.length]};border-radius:2px;--dx:${(Math.random() - .5) * 320}px;--rot:${Math.random() * 900}deg;` +
+      `animation:confetti ${2.2 + Math.random() * 1.8}s ${Math.random() * .6}s cubic-bezier(.3,.6,.4,1) forwards`;
+    box.appendChild(p);
+  }
+  document.body.appendChild(box);
+  setTimeout(() => box.remove(), 5200);
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   SYNC TRANSPORTS  (same interface: set/get/on/now/onConnection/close)
+   ════════════════════════════════════════════════════════════════════════════ */
+const getIn = (o, path) => path.split('/').filter(Boolean).reduce((a, k) => (a == null ? a : a[k]), o);
+function setIn(o, path, val) {
+  const ks = path.split('/').filter(Boolean);
+  let cur = o;
+  for (let i = 0; i < ks.length - 1; i++) { if (cur[ks[i]] == null || typeof cur[ks[i]] !== 'object') cur[ks[i]] = {}; cur = cur[ks[i]]; }
+  if (val == null) delete cur[ks[ks.length - 1]]; else cur[ks[ks.length - 1]] = val;
+}
+
+/** Local demo transport: localStorage + BroadcastChannel (tabs in the same browser only). */
+class LocalTransport {
+  constructor(code) {
+    this.mode = 'local'; this.code = code; this.key = 'civic:room:' + code; this.listeners = [];
+    try { this.bc = new BroadcastChannel('civic:' + code); this.bc.onmessage = () => this._notify(); } catch {}
+    this._onStorage = e => { if (e.key === this.key) this._notify(); };
+    window.addEventListener('storage', this._onStorage);
+  }
+  _read() { return store.get(this.key, {}) || {}; }
+  now() { return Date.now(); }
+  set(path, val) {
+    const root = this._read(); setIn(root, path, val == null ? null : JSON.parse(JSON.stringify(val)));
+    store.set(this.key, root); this._notify(); try { this.bc && this.bc.postMessage(1); } catch {}
+    return Promise.resolve();
+  }
+  get(path) { const v = getIn(this._read(), path); return Promise.resolve(v === undefined ? null : v); }
+  on(path, cb) {
+    const l = { path, cb, last: undefined }; this.listeners.push(l);
+    setTimeout(() => this._notify(), 0);
+    return () => { this.listeners = this.listeners.filter(x => x !== l); };
+  }
+  _notify() {
+    const root = this._read();
+    this.listeners.slice().forEach(l => {
+      const v = getIn(root, l.path), val = v === undefined ? null : v, s = JSON.stringify(val);
+      if (s !== l.last) { l.last = s; l.cb(val); }
+    });
+  }
+  onConnection(cb) { cb(true); }
+  close() { try { this.bc && this.bc.close(); } catch {} window.removeEventListener('storage', this._onStorage); this.listeners = []; }
+}
+
+/** Firebase Realtime Database transport (compat SDK loaded on demand). */
+class FirebaseTransport {
+  constructor(code, cfg) {
+    this.mode = 'firebase'; this.code = code; this.offset = 0; this.connected = false; this.connCbs = [];
+    const app = firebase.apps.length ? firebase.app() : firebase.initializeApp(cfg);
+    this.db = firebase.database(app);
+    this._offRef = this.db.ref('.info/serverTimeOffset'); this._offRef.on('value', s => { this.offset = s.val() || 0; });
+    this._conRef = this.db.ref('.info/connected');
+    this._conRef.on('value', s => { this.connected = !!s.val(); this.connCbs.forEach(f => f(this.connected)); });
+  }
+  now() { return Date.now() + this.offset; }
+  ref(p) { return this.db.ref('rooms/' + this.code + (p ? '/' + p : '')); }
+  set(p, v) { return v == null ? this.ref(p).remove() : this.ref(p).set(JSON.parse(JSON.stringify(v))); }
+  get(p) { return this.ref(p).once('value').then(s => s.val()); }
+  on(p, cb) { const r = this.ref(p), h = s => cb(s.val()); r.on('value', h); return () => r.off('value', h); }
+  onConnection(cb) { this.connCbs.push(cb); cb(this.connected); }
+  close() { this.connCbs = []; try { this._offRef.off(); this._conRef.off(); } catch {} }
+}
+
+const getFirebaseConfig = () => FIREBASE_CONFIG || store.get('civic:fb', null);
+async function createTransport(code) {
+  const cfg = getFirebaseConfig();
+  if (cfg && cfg.databaseURL) {
+    if (!(window.firebase && firebase.apps)) {
+      await loadScript('https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js');
+      await loadScript('https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js');
+    }
+    return new FirebaseTransport(code, cfg);
+  }
+  return new LocalTransport(code);
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   SHARED GAME LOGIC
+   ════════════════════════════════════════════════════════════════════════════ */
+const remaining = s => s.startingBudget - s.spent;
+function normalizeState(s) {
+  if (!s || typeof s !== 'object') return null;
+  s.queue = toArr(s.queue); s.placed = toArr(s.placed); s.decisions = toArr(s.decisions);
+  s.spent = s.spent || 0; s.idx = s.idx || 0;
+  return s;
+}
+const gridDims = s => ({ cols: COLS, rows: Math.max(5, Math.ceil((s.queue.length + (s.baseline ? 4 : 0)) / COLS)) });
+function baselineTiles(rows) {
+  const m = Math.floor(rows / 2);
+  return [
+    { r: m,     c: 3, name: 'City Hall',       icon: '🏛️', category: 'Other' },
+    { r: m,     c: 1, name: 'Old Town Homes',  icon: '🏡', category: 'Housing' },
+    { r: m - 1, c: 4, name: 'Main Street',     icon: '🏬', category: 'Economy' },
+    { r: m + 1, c: 5, name: 'Riverside Homes', icon: '🏘️', category: 'Housing' }
+  ];
+}
+function fillOrder(code, rows, baseline) {
+  const base = new Set(baseline ? baselineTiles(rows).map(t => t.r * COLS + t.c) : []);
+  const cr = (rows - 1) / 2, cc = (COLS - 1) / 2, arr = [];
+  for (let r = 0; r < rows; r++) for (let c = 0; c < COLS; c++) {
+    const idx = r * COLS + c; if (base.has(idx)) continue;
+    arr.push([Math.hypot(r - cr, (c - cc) * .8) + (hash(code + ':' + idx) % 100) / 100 * .9, idx]);
+  }
+  return arr.sort((a, b) => a[0] - b[0]).map(x => x[1]);
+}
+const cityTier = n => ['Hamlet', 'Village', 'Town', 'City', 'Metropolis'][Math.min(4, Math.floor(n / 3))];
+
+/* ════════════════════════════════════════════════════════════════════════════
+   VIEW INFRASTRUCTURE
+   ════════════════════════════════════════════════════════════════════════════ */
+const app = document.getElementById('app');
+let teardown = [];
+function cleanup() { teardown.forEach(f => { try { f(); } catch (e) { console.error(e); } }); teardown = []; }
+function splash(msg) {
+  return `<div class="min-h-screen bg-grid grid place-items-center"><div class="text-center"><div class="text-5xl mb-4 animate-bounce">🏙️</div><div class="text-slate-300 font-semibold">${esc(msg)}</div></div></div>`;
+}
+function openModal(inner, cls = 'max-w-lg') {
+  const m = document.createElement('div');
+  m.className = 'fixed inset-0 z-[80] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm fade-in';
+  m.innerHTML = `<div class="w-full ${cls} max-h-[92vh] overflow-auto rounded-3xl bg-white text-slate-900 shadow-2xl pop">${inner}</div>`;
+  const close = () => m.remove();
+  m.addEventListener('click', e => { if (e.target === m || e.target.closest('[data-close]')) close(); });
+  document.body.appendChild(m);
+  teardown.push(close);
+  m.close = close;
+  return m;
+}
+const syncBadge = () => getFirebaseConfig()
+  ? `<span class="inline-flex items-center gap-2 text-xs font-semibold text-emerald-300"><span class="w-2 h-2 rounded-full bg-emerald-400"></span>Live sync (Firebase)</span>`
+  : `<span class="inline-flex items-center gap-2 text-xs font-semibold text-amber-300"><span class="w-2 h-2 rounded-full bg-amber-400"></span>Local demo mode</span>`;
+
+/* ════════════════════════════════════════════════════════════════════════════
+   LANDING
+   ════════════════════════════════════════════════════════════════════════════ */
+function openSyncModal() {
+  const cfg = getFirebaseConfig();
+  const m = openModal(`
+    <div class="p-6 md:p-8">
+      <div class="flex items-start justify-between gap-4">
+        <div><h2 class="font-display text-2xl font-bold">Sync settings</h2>
+        <p class="text-sm text-slate-500 mt-1">Connect a free Firebase Realtime Database so phones, tablets and laptops can join the same room.</p></div>
+        <button data-close class="btn btn-light !px-3 !py-1.5">✕</button>
+      </div>
+      <ol class="mt-5 space-y-2 text-sm text-slate-700 list-decimal pl-5">
+        <li>Create a project at <b>console.firebase.google.com</b> (no billing needed).</li>
+        <li>Open <b>Build → Realtime Database → Create database</b>.</li>
+        <li>On the <b>Rules</b> tab paste the rules below and publish.</li>
+        <li>Copy the database URL from the <b>Data</b> tab and paste it here. Do this on each device, or hard-code it in <code class="bg-slate-100 px-1 rounded">FIREBASE_CONFIG</code> in the file.</li>
+      </ol>
+      <pre class="mt-4 text-xs bg-slate-900 text-emerald-300 rounded-xl p-4 overflow-auto">{
+  "rules": {
+    "rooms": {
+      "$room": { ".read": true, ".write": true }
+    }
+  }
+}</pre>
+      <p class="text-xs text-slate-500 mt-2">These rules are open, which suits a live event. Delete the database (or change the rules) afterwards.</p>
+      <label class="lbl mt-5" for="fbUrl">Realtime Database URL</label>
+      <input id="fbUrl" class="field" placeholder="https://your-project-default-rtdb.firebaseio.com" value="${esc(cfg?.databaseURL || '')}">
+      <div class="flex gap-3 mt-5">
+        <button id="fbSave" class="btn btn-green flex-1">Save &amp; use live sync</button>
+        <button id="fbClear" class="btn btn-light">Use local demo</button>
+      </div>
+    </div>`, 'max-w-xl');
+  $('#fbSave', m).onclick = () => {
+    const url = $('#fbUrl', m).value.trim().replace(/\/+$/, '');
+    if (!/^https:\/\/.+\.(firebaseio\.com|firebasedatabase\.app)$/i.test(url)) { toast('Enter a valid Firebase Realtime Database URL', 'error'); return; }
+    store.set('civic:fb', { databaseURL: url }); m.close(); toast('Live sync enabled'); showLanding();
+  };
+  $('#fbClear', m).onclick = () => { store.del('civic:fb'); m.close(); toast('Switched to local demo mode'); showLanding(); };
+}
+
+function showLanding(notice) {
+  cleanup();
+  const lastHost = store.get('civic:lastHost', null);
+  const lastTable = store.get('civic:lastTable', { code: '', name: '' });
+  const hashCode = ((location.hash.match(/join=([A-Za-z0-9]+)/) || [])[1] || '').toUpperCase();
+  app.innerHTML = `
+  <div class="min-h-screen bg-grid flex flex-col">
+    <header class="px-5 md:px-8 py-5 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-11 h-11 rounded-2xl bg-emerald-400 grid place-items-center text-2xl">🏙️</div>
+        <div>
+          <div class="font-display font-bold text-xl text-white leading-none">CityBudget<span class="text-emerald-400"> Live</span></div>
+          <div class="text-xs text-slate-400 mt-1">A municipal budgeting simulation, voted live by the room</div>
+        </div>
+      </div>
+      <button data-act="sync" class="btn btn-ghost !py-2 text-sm">${syncBadge()} <span class="text-slate-400">⚙</span></button>
+    </header>
+    ${notice ? `<div class="mx-auto w-full max-w-5xl px-4"><div class="rounded-xl bg-rose-500/15 border border-rose-400/30 text-rose-200 text-sm px-4 py-3 pop">${esc(notice)}</div></div>` : ''}
+    <main class="flex-1 grid place-items-center px-4 py-8">
+      <div class="w-full max-w-5xl grid md:grid-cols-2 gap-6">
+        <section class="panel p-7 md:p-9 flex flex-col">
+          <div class="text-4xl mb-4">📽️</div>
+          <h1 class="font-display text-3xl md:text-4xl font-bold text-white leading-tight">Run the presentation</h1>
+          <p class="text-slate-400 mt-3 leading-relaxed">Project this screen. Set the budget and the project queue, then put each item to a live vote and watch the city fill in.</p>
+          <div class="mt-auto pt-8 space-y-3">
+            <button data-act="host" class="btn btn-green w-full !text-lg !py-4">Launch host screen</button>
+            ${lastHost ? `<button data-act="resume" class="btn btn-ghost w-full">Resume room <span class="num font-bold tracking-widest">${esc(lastHost)}</span></button>` : ''}
+          </div>
+        </section>
+        <section class="card p-7 md:p-9 flex flex-col">
+          <div class="text-4xl mb-4">🗳️</div>
+          <h2 class="font-display text-3xl md:text-4xl font-bold leading-tight">Vote from a table</h2>
+          <p class="text-slate-500 mt-3 leading-relaxed">Enter the room code shown on the main screen and name your table. One vote per table, per item.</p>
+          <div class="mt-6 space-y-4">
+            <div><label class="lbl" for="jCode">Room code</label>
+              <input id="jCode" class="field num !text-2xl !font-bold tracking-[.35em] uppercase text-center" maxlength="6" autocomplete="off" autocapitalize="characters" placeholder="ABCD" value="${esc(hashCode || lastTable.code)}"></div>
+            <div><label class="lbl" for="jName">Table name</label>
+              <input id="jName" class="field" maxlength="24" placeholder="Table 1" value="${esc(lastTable.name)}"></div>
+          </div>
+          <button data-act="join" class="btn btn-dark w-full !text-lg !py-4 mt-6">Join as table</button>
+        </section>
+      </div>
+    </main>
+    <footer class="text-center text-xs text-slate-500 pb-6 px-4">
+      ${getFirebaseConfig() ? 'Live sync is on: any device with the room code can join.' : 'Local demo mode: table screens only work in other tabs of this same browser. Open ⚙ to connect live sync for real devices.'}
+    </footer>
+  </div>`;
+
+  const onClick = e => {
+    const b = e.target.closest('[data-act]'); if (!b) return;
+    const a = b.dataset.act;
+    if (a === 'sync') openSyncModal();
+    else if (a === 'host') showSetup();
+    else if (a === 'resume') showHost(lastHost, null, false);
+    else if (a === 'join') {
+      const code = $('#jCode').value.trim().toUpperCase(), name = $('#jName').value.trim();
+      if (code.length < 3) { toast('Enter the room code from the main screen', 'error'); return; }
+      if (!name) { toast('Give your table a name, like "Table 2"', 'error'); return; }
+      showTable(code, name);
+    }
+  };
+  app.addEventListener('click', onClick);
+  teardown.push(() => app.removeEventListener('click', onClick));
+  if (hashCode && !lastTable.name) setTimeout(() => $('#jName')?.focus(), 50);
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   HOST SETUP
+   ════════════════════════════════════════════════════════════════════════════ */
+function showSetup() {
+  cleanup();
+  const saved = store.get('civic:draft', null);
+  const draft = saved || {
+    title: 'Imaginary City', budget: 15000000, duration: 30, baseline: true, autoEnd: false, autoContinue: 10,
+    queue: PRESETS.filter(p => p.def).map(p => ({ id: p.id, name: p.name, cost: p.cost, category: p.category, icon: p.icon }))
+  };
+  const code = genCode();
+  let editingId = null;
+  const save = () => store.set('civic:draft', draft);
+
+  app.innerHTML = `
+  <div class="min-h-screen bg-grid">
+    <header class="sticky top-0 z-30 bg-slate-950/80 backdrop-blur border-b border-white/5">
+      <div class="max-w-7xl mx-auto px-4 md:px-6 h-16 flex items-center justify-between gap-3">
+        <div class="flex items-center gap-3">
+          <button data-act="back" class="btn btn-ghost !py-2 !px-3">← Back</button>
+          <div class="font-display font-bold text-white text-lg hidden sm:block">Host setup</div>
+        </div>
+        <div class="flex items-center gap-4"><span class="hidden md:block">${syncBadge()}</span>
+          <button data-act="launch" id="sLaunch" class="btn btn-green !py-2.5">Launch presentation</button></div>
+      </div>
+    </header>
+    <main class="max-w-7xl mx-auto p-4 md:p-6 grid lg:grid-cols-12 gap-6">
+      <section class="lg:col-span-5 space-y-6">
+        <div class="card p-6">
+          <h2 class="font-display text-xl font-bold mb-4">Session</h2>
+          <div class="space-y-4">
+            <div><label class="lbl" for="sTitle">City name</label><input id="sTitle" class="field" maxlength="40" value="${esc(draft.title)}"></div>
+            <div><label class="lbl" for="sBudget">Starting budget</label>
+              <input id="sBudget" class="field num !text-xl !font-bold" inputmode="numeric" value="${esc(fmt(draft.budget))}">
+              <div class="flex flex-wrap gap-2 mt-2">${[5e6, 10e6, 15e6, 25e6, 50e6].map(v => `<button data-act="bud" data-v="${v}" class="chip bg-slate-100 text-slate-700 hover:bg-emerald-100 cursor-pointer">${fmtShort(v)}</button>`).join('')}</div></div>
+            <div class="grid grid-cols-2 gap-3">
+              <div><label class="lbl" for="sDur">Vote timer</label>
+                <select id="sDur" class="field">${[15, 20, 30, 45, 60, 90].map(v => `<option value="${v}" ${draft.duration === v ? 'selected' : ''}>${v} seconds</option>`).join('')}</select></div>
+              <div><label class="lbl" for="sAuto">Auto-continue after result</label>
+                <select id="sAuto" class="field">${[[0, 'Off (manual)'], [6, '6 seconds'], [10, '10 seconds'], [15, '15 seconds']].map(([v, l]) => `<option value="${v}" ${draft.autoContinue === v ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
+            </div>
+            <label class="flex items-center gap-3 text-sm font-medium cursor-pointer"><input id="sBase" type="checkbox" class="w-5 h-5 accent-emerald-500" ${draft.baseline ? 'checked' : ''}> Start the city with existing zones (City Hall, homes, Main Street)</label>
+            <label class="flex items-center gap-3 text-sm font-medium cursor-pointer"><input id="sEnd" type="checkbox" class="w-5 h-5 accent-emerald-500" ${draft.autoEnd ? 'checked' : ''}> End a vote early once every connected table has voted</label>
+          </div>
+        </div>
+        <div class="card p-6">
+          <div class="flex items-center justify-between mb-3"><h2 class="font-display text-xl font-bold">Project library</h2><span class="text-xs text-slate-500">Tap to add to the queue</span></div>
+          <div id="sLib" class="space-y-2 max-h-[420px] overflow-auto pr-1"></div>
+        </div>
+      </section>
+
+      <section class="lg:col-span-7 space-y-6">
+        <div class="card p-6">
+          <div class="flex items-start justify-between gap-3 mb-1">
+            <div><h2 class="font-display text-xl font-bold">Vote queue</h2><div id="sSummary" class="text-sm text-slate-500 mt-1"></div></div>
+            <div class="flex gap-2"><button data-act="defaults" class="btn btn-light !py-1.5 text-sm">Reset</button><button data-act="clear" class="btn btn-light !py-1.5 text-sm">Clear</button></div>
+          </div>
+          <div id="sBudBar" class="h-2.5 rounded-full bg-slate-100 overflow-hidden my-3"><div class="h-full bg-emerald-500 transition-all" style="width:0%"></div></div>
+          <ul id="sQueue" class="space-y-2 max-h-[460px] overflow-auto pr-1"></ul>
+        </div>
+        <div class="card p-6">
+          <h2 class="font-display text-xl font-bold mb-4" id="fTitle">Add a custom project</h2>
+          <div class="grid sm:grid-cols-2 gap-4">
+            <div><label class="lbl" for="fName">Name</label><input id="fName" class="field" maxlength="40" placeholder="e.g. Skate Park"></div>
+            <div><label class="lbl" for="fCost">Cost (USD)</label><input id="fCost" class="field num" type="number" min="0" step="50000" placeholder="1500000"></div>
+            <div><label class="lbl" for="fCat">Category</label><select id="fCat" class="field">${Object.keys(CATS).map(c => `<option>${esc(c)}</option>`).join('')}</select></div>
+            <div><label class="lbl" for="fIcon">Icon: emoji or image URL</label>
+              <div class="flex gap-2 items-center"><input id="fIcon" class="field" placeholder="🛹 or https://…/image.png"><div id="fPrev" class="w-12 h-12 shrink-0 rounded-xl bg-slate-100 grid place-items-center text-3xl"></div></div></div>
+          </div>
+          <div class="flex flex-wrap gap-1.5 mt-3" id="fEmojis">${EMOJIS.map(e => `<button type="button" data-act="emo" data-e="${e}" class="w-9 h-9 rounded-lg bg-slate-100 hover:bg-emerald-100 text-xl">${e}</button>`).join('')}</div>
+          <div class="flex gap-3 mt-5">
+            <button data-act="addItem" id="fSubmit" class="btn btn-dark">Add to queue</button>
+            <button data-act="cancelEdit" id="fCancel" class="btn btn-light hidden">Cancel edit</button>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>`;
+
+  /* --- dynamic regions --- */
+  function renderLib() {
+    const inQ = new Set(draft.queue.map(q => q.id));
+    setHTML($('#sLib'), PRESETS.map(p => `
+      <div class="flex items-center gap-3 p-2.5 rounded-xl border border-slate-200">
+        <div class="w-10 h-10 rounded-xl grid place-items-center text-2xl shrink-0" style="background:${catColor(p.category)}26">${iconHTML(p.icon)}</div>
+        <div class="min-w-0 flex-1"><div class="font-semibold text-sm truncate">${esc(p.name)}</div><div class="text-xs text-slate-500">${esc(p.category)} · <b class="num">${fmt(p.cost)}</b></div></div>
+        ${inQ.has(p.id) ? '<span class="text-xs font-bold text-emerald-600">✓ Added</span>' : `<button data-act="libAdd" data-id="${p.id}" class="btn btn-light !py-1.5 !px-3 text-sm">+ Add</button>`}
+      </div>`).join(''));
+  }
+  function renderQueue() {
+    const total = draft.queue.reduce((a, q) => a + (+q.cost || 0), 0);
+    const pct = draft.budget ? Math.round(total / draft.budget * 100) : 0;
+    $('#sSummary').innerHTML = `${draft.queue.length} projects · <b class="num">${fmt(total)}</b> requested · ${pct}% of budget`;
+    const bar = $('#sBudBar > div'); bar.style.width = Math.min(100, pct) + '%'; bar.className = 'h-full transition-all ' + (pct > 100 ? 'bg-amber-500' : 'bg-emerald-500');
+    setHTML($('#sQueue'), draft.queue.length ? draft.queue.map((q, i) => `
+      <li class="flex items-center gap-3 p-2.5 rounded-xl border border-slate-200 bg-white">
+        <span class="w-6 text-center text-xs font-bold text-slate-400 num">${i + 1}</span>
+        <div class="w-11 h-11 rounded-xl grid place-items-center text-2xl shrink-0" style="background:${catColor(q.category)}26">${iconHTML(q.icon)}</div>
+        <div class="min-w-0 flex-1"><div class="font-semibold truncate">${esc(q.name)}</div><div class="text-xs text-slate-500">${esc(q.category)} · <b class="num">${fmt(q.cost)}</b></div></div>
+        <div class="flex gap-1">
+          <button data-act="up" data-i="${i}" class="btn btn-light !p-1.5 !w-8" ${i === 0 ? 'disabled' : ''} aria-label="Move up">↑</button>
+          <button data-act="down" data-i="${i}" class="btn btn-light !p-1.5 !w-8" ${i === draft.queue.length - 1 ? 'disabled' : ''} aria-label="Move down">↓</button>
+          <button data-act="edit" data-i="${i}" class="btn btn-light !p-1.5 !w-8" aria-label="Edit">✎</button>
+          <button data-act="del" data-i="${i}" class="btn btn-light !p-1.5 !w-8 !text-rose-600" aria-label="Remove">✕</button>
+        </div>
+      </li>`).join('') : `<li class="text-center text-slate-500 py-10">The queue is empty. Add projects from the library or create your own.</li>`);
+  }
+  function renderPrev() { $('#fPrev').innerHTML = iconHTML($('#fIcon').value.trim() || CATS[$('#fCat').value].icon); }
+  function resetForm() {
+    editingId = null; $('#fName').value = ''; $('#fCost').value = ''; $('#fIcon').value = ''; $('#fCat').selectedIndex = 0;
+    $('#fTitle').textContent = 'Add a custom project'; $('#fSubmit').textContent = 'Add to queue'; $('#fCancel').classList.add('hidden'); renderPrev();
+  }
+  renderLib(); renderQueue(); renderPrev();
+
+  /* --- inputs --- */
+  $('#sTitle').oninput = e => { draft.title = e.target.value; save(); };
+  $('#sBudget').oninput = e => { draft.budget = parseInt(e.target.value.replace(/\D/g, ''), 10) || 0; save(); renderQueue(); };
+  $('#sBudget').onblur = e => { e.target.value = fmt(draft.budget); };
+  $('#sDur').onchange = e => { draft.duration = +e.target.value; save(); };
+  $('#sAuto').onchange = e => { draft.autoContinue = +e.target.value; save(); };
+  $('#sBase').onchange = e => { draft.baseline = e.target.checked; save(); };
+  $('#sEnd').onchange = e => { draft.autoEnd = e.target.checked; save(); };
+  $('#fIcon').oninput = renderPrev; $('#fCat').onchange = renderPrev;
+
+  const onClick = e => {
+    const b = e.target.closest('[data-act]'); if (!b) return;
+    const a = b.dataset.act, i = +b.dataset.i;
+    switch (a) {
+      case 'back': showLanding(); return;
+      case 'bud': draft.budget = +b.dataset.v; $('#sBudget').value = fmt(draft.budget); break;
+      case 'libAdd': { const p = PRESETS.find(x => x.id === b.dataset.id); draft.queue.push({ id: p.id, name: p.name, cost: p.cost, category: p.category, icon: p.icon }); break; }
+      case 'up': [draft.queue[i - 1], draft.queue[i]] = [draft.queue[i], draft.queue[i - 1]]; break;
+      case 'down': [draft.queue[i + 1], draft.queue[i]] = [draft.queue[i], draft.queue[i + 1]]; break;
+      case 'del': draft.queue.splice(i, 1); break;
+      case 'clear': if (draft.queue.length && confirm('Remove every project from the queue?')) draft.queue = []; break;
+      case 'defaults': if (confirm('Reset the queue to the default projects?')) draft.queue = PRESETS.filter(p => p.def).map(p => ({ id: p.id, name: p.name, cost: p.cost, category: p.category, icon: p.icon })); break;
+      case 'edit': {
+        const q = draft.queue[i]; editingId = q.id;
+        $('#fName').value = q.name; $('#fCost').value = q.cost; $('#fCat').value = q.category; $('#fIcon').value = q.icon || '';
+        $('#fTitle').textContent = 'Edit project'; $('#fSubmit').textContent = 'Save changes'; $('#fCancel').classList.remove('hidden'); renderPrev();
+        $('#fName').scrollIntoView({ behavior: 'smooth', block: 'center' }); $('#fName').focus(); return;
+      }
+      case 'cancelEdit': resetForm(); return;
+      case 'emo': $('#fIcon').value = b.dataset.e; renderPrev(); return;
+      case 'addItem': {
+        const name = $('#fName').value.trim(), cost = Math.round(+$('#fCost').value);
+        if (!name) { toast('Give the project a name', 'error'); $('#fName').focus(); return; }
+        if (!(cost > 0)) { toast('Enter a cost above $0', 'error'); $('#fCost').focus(); return; }
+        const item = { id: editingId || uid(), name, cost, category: $('#fCat').value, icon: $('#fIcon').value.trim() || CATS[$('#fCat').value].icon };
+        if (editingId) { const k = draft.queue.findIndex(q => q.id === editingId); if (k >= 0) draft.queue[k] = item; } else draft.queue.push(item);
+        resetForm(); break;
+      }
+      case 'launch': {
+        if (!(draft.budget > 0)) { toast('Set a starting budget above $0', 'error'); return; }
+        if (!draft.queue.length) { toast('Add at least one project to the queue', 'error'); return; }
+        save();
+        showHost(code, {
+          v: 1, code, title: draft.title || 'Imaginary City', startingBudget: draft.budget, spent: 0, baseline: !!draft.baseline,
+          autoEnd: !!draft.autoEnd, autoContinue: +draft.autoContinue || 0, durationSec: +draft.duration || 30,
+          queue: draft.queue.map(q => ({ id: q.id, name: q.name, cost: +q.cost, category: q.category, icon: q.icon || '📦' })),
+          idx: 0, placed: [], decisions: [], phase: 'idle', voteId: null, endsAt: null, durationMs: 0, result: null, rev: 0, createdAt: Date.now()
+        }, true);
+        return;
+      }
+    }
+    save(); renderLib(); renderQueue();
+  };
+  app.addEventListener('click', onClick);
+  teardown.push(() => app.removeEventListener('click', onClick));
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   HOST / MAIN PRESENTATION SCREEN
+   ════════════════════════════════════════════════════════════════════════════ */
+async function showHost(code, initial, isNew) {
+  cleanup();
+  app.innerHTML = splash('Opening room…');
+  let transport, state = initial;
+  try {
+    transport = await createTransport(code);
+    teardown.push(() => transport.close());
+    if (isNew) {
+      for (let n = 0; n < 5; n++) {
+        const ex = await timeout(transport.get('state'), 8000);
+        if (!ex) break;
+        code = genCode(); transport.close(); transport = await createTransport(code);
+        teardown.length = 0; teardown.push(() => transport.close());
+      }
+      state.code = code;
+      await timeout(transport.set('tables', null), 8000); await timeout(transport.set('votes', null), 8000);
+      await timeout(transport.set('state', state), 8000);
+    } else {
+      state = normalizeState(await timeout(transport.get('state'), 8000));
+      if (!state) { showLanding(`Room ${code} is no longer available. Launch a new host screen.`); return; }
+    }
+  } catch (err) {
+    showLanding('Could not reach the sync service (' + err.message + '). Check Sync settings and your connection.'); return;
+  }
+  state = normalizeState(state);
+  store.set('civic:lastHost', code);
+
+  /* ---- local runtime ---- */
+  let tables = {}, votes = {}, connected = true;
+  let durSec = state.durationSec || 30, ending = false, lastBeep = -1, lastSlow = 0, allVotedAt = 0;
+  let resultShownAt = 0, autoPaused = false, finishedDismissed = false;
+  const animateIds = new Set();
+  const revealed = new Set(state.placed.map(p => p.id));
+  if (state.phase === 'result' && state.result && state.result.passed) revealed.delete(state.result.itemId);
+
+  const curItem = () => state.queue[state.idx] || null;
+  const tableList = () => {
+    const vs = (state.phase === 'voting' || state.phase === 'result') ? (votes?.[state.voteId] || {}) : {};
+    const now = transport.now();
+    return Object.entries(tables || {}).map(([id, t]) => ({ id, name: t?.name || id, online: now - (t?.lastSeen || 0) < STALE_MS, voted: id in vs })).sort(natSort);
+  };
+
+  /* ---- skeleton ---- */
+  app.innerHTML = `
+  <div class="min-h-screen lg:h-screen flex flex-col bg-grid lg:overflow-hidden">
+    <header class="shrink-0 h-14 px-4 flex items-center justify-between gap-3 border-b border-white/5 bg-slate-950/60 backdrop-blur">
+      <div class="flex items-center gap-3 min-w-0">
+        <div class="w-8 h-8 rounded-xl bg-emerald-400 grid place-items-center text-lg">🏙️</div>
+        <div class="font-display font-bold text-white truncate">${esc(state.title)}</div>
+      </div>
+      <button data-act="join" class="flex items-center gap-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 px-4 py-1.5" title="Show join instructions">
+        <span class="text-xs font-semibold text-slate-400">Join code</span>
+        <span class="num text-2xl font-bold text-white tracking-[.3em] leading-none">${esc(code)}</span>
+      </button>
+      <div class="flex items-center gap-2">
+        <div id="hConn" class="hidden md:flex items-center gap-2 text-xs font-semibold text-slate-300 mr-2"></div>
+        <button data-act="sound" id="hSound" class="btn btn-ghost !py-1.5 !px-3" title="Sound on/off"></button>
+        <button data-act="fs" class="btn btn-ghost !py-1.5 !px-3" title="Fullscreen">⛶</button>
+        <button data-act="menu" class="btn btn-ghost !py-1.5 !px-3" title="Session menu">⋯</button>
+      </div>
+    </header>
+    <main class="flex-1 min-h-0 grid lg:grid-cols-12 gap-4 p-4">
+      <section class="lg:col-span-5 flex flex-col gap-4 min-h-0 lg:overflow-y-auto pr-0.5">
+        <div class="card p-5 xl:p-6 shrink-0">
+          <div class="flex items-center justify-between"><div class="text-sm font-semibold text-slate-500">Remaining budget</div><div id="bStats" class="text-xs font-semibold text-slate-400"></div></div>
+          <div id="bRem" class="num text-5xl xl:text-7xl font-bold text-emerald-600 leading-tight">$0</div>
+          <div class="h-3 rounded-full bg-rose-100 overflow-hidden mt-2"><div id="bBar" class="h-full bg-emerald-500 transition-all duration-700" style="width:100%"></div></div>
+          <div class="flex items-end justify-between mt-3">
+            <div><div class="text-xs font-semibold text-slate-500">Total spent</div><div id="bSpent" class="num text-2xl xl:text-3xl font-bold text-rose-600">$0</div></div>
+            <div class="text-right"><div class="text-xs font-semibold text-slate-500">Starting budget</div><div id="bStart" class="num text-lg xl:text-xl font-semibold text-slate-700"></div></div>
+          </div>
+        </div>
+        <div id="cItem" class="card p-5 xl:p-6 shrink-0"></div>
+        <div id="cVote" class="panel p-5 xl:p-6 shrink-0"></div>
+        <div id="cNext" class="shrink-0 px-1 pb-1"></div>
+      </section>
+      <section class="lg:col-span-7 min-h-0 flex flex-col panel p-4 xl:p-5">
+        <div class="flex items-center justify-between gap-3 mb-3 shrink-0">
+          <div><div class="font-display text-xl xl:text-2xl font-bold text-white">Imaginary City</div><div id="cSub" class="text-sm text-slate-400"></div></div>
+          <div id="cStats" class="flex gap-2 flex-wrap justify-end"></div>
+        </div>
+        <div id="cGrid" class="flex-1 min-h-0"></div>
+        <div id="cLegend" class="flex flex-wrap gap-2 mt-3 shrink-0 min-h-[1.75rem]"></div>
+      </section>
+    </main>
+  </div>
+  <div id="hOverlay"></div>`;
+
+  /* ---- commit state ---- */
+  function commit(fn) {
+    fn(state); state.rev = (state.rev || 0) + 1;
+    Promise.resolve(transport.set('state', state)).catch(err => toast('Sync error: ' + err.message, 'error'));
+    renderAll();
+  }
+
+  /* ---- actions ---- */
+  function startVote() {
+    if (state.phase !== 'idle' || !curItem()) return;
+    beep(520, .1); setTimeout(() => beep(780, .14), 110);
+    lastBeep = -1; allVotedAt = 0;
+    commit(s => { s.phase = 'voting'; s.voteId = uid(); s.durationSec = durSec; s.durationMs = durSec * 1000; s.endsAt = transport.now() + durSec * 1000; s.result = null; });
+  }
+  async function endVote() {
+    if (state.phase !== 'voting' || ending) return;
+    ending = true;
+    let vs = votes?.[state.voteId] || {};
+    try { const fresh = await timeout(transport.get('votes/' + state.voteId), 2000); if (fresh) vs = fresh; } catch {}
+    const item = curItem();
+    let yes = 0, no = 0;
+    Object.values(vs).forEach(v => { if (v === 'yes') yes++; else if (v === 'no') no++; });
+    const total = Math.max(tableList().filter(t => t.online).length, yes + no);
+    const rem = remaining(state);
+    let passed = false, reason;
+    if (yes + no === 0) reason = 'No votes were cast';
+    else if (yes > no) { if (item.cost <= rem) { passed = true; reason = 'Majority voted yes'; } else reason = 'Voters approved it, but the budget can’t cover it'; }
+    else if (yes === no) reason = 'Tie: a majority is required';
+    else reason = 'Majority voted no';
+    const result = { voteId: state.voteId, itemId: item.id, name: item.name, cost: item.cost, icon: item.icon, category: item.category, yes, no, voted: yes + no, total, passed, reason };
+    commit(s => {
+      s.phase = 'result'; s.result = result;
+      s.decisions.push({ itemId: item.id, name: item.name, cost: item.cost, passed, yes, no });
+      if (passed) { const order = fillOrder(s.code, gridDims(s).rows, s.baseline); s.spent += item.cost; s.placed.push({ id: item.id, name: item.name, cost: item.cost, category: item.category, icon: item.icon, slot: order[s.placed.length] ?? null }); }
+    });
+    ending = false;
+  }
+  function continueAfterResult() {
+    if (state.phase !== 'result') return;
+    const r = state.result;
+    if (r && r.passed) { revealed.add(r.itemId); animateIds.add(r.itemId); setTimeout(() => beep(196, .25, 'triangle', .14), 450); }
+    commit(s => { s.idx++; s.phase = s.idx >= s.queue.length ? 'finished' : 'idle'; });
+    animateIds.clear();
+  }
+  function skipItem() {
+    if (state.phase !== 'idle' || state.queue.length - state.idx < 2) { toast('No other item to skip to'); return; }
+    commit(s => { s.queue.push(s.queue.splice(s.idx, 1)[0]); });
+  }
+  function finishSession() {
+    if (!confirm('Finish the session now? Remaining items will not be voted on.')) return;
+    commit(s => { s.phase = 'finished'; });
+  }
+
+  /* ---- renderers ---- */
+  function renderBudget() {
+    const rem = remaining(state), pct = Math.max(0, Math.min(100, rem / state.startingBudget * 100));
+    setMoney($('#bRem'), rem); setMoney($('#bSpent'), state.spent); $('#bStart').textContent = fmt(state.startingBudget);
+    $('#bBar').style.width = pct + '%';
+    $('#bBar').className = 'h-full transition-all duration-700 ' + (pct < 15 ? 'bg-amber-500' : 'bg-emerald-500');
+    $('#bRem').className = 'num text-5xl xl:text-7xl font-bold leading-tight ' + (rem <= 0 ? 'text-rose-600' : 'text-emerald-600');
+    const ok = state.decisions.filter(d => d.passed).length, no = state.decisions.length - ok;
+    $('#bStats').textContent = `${ok} funded · ${no} rejected`;
+  }
+  function renderItem() {
+    const it = curItem(), rem = remaining(state), n = state.queue.length;
+    if (state.phase === 'finished' || !it) {
+      setHTML($('#cItem'), `<div class="text-center py-6"><div class="text-6xl mb-2">🎉</div><div class="font-display text-3xl font-bold">All items decided</div><div class="text-slate-500 mt-1">Your city is complete.</div></div>`);
+      return;
+    }
+    const c = catColor(it.category), over = it.cost > rem, pct = Math.round(it.cost / Math.max(rem, 1) * 100);
+    const live = state.phase === 'voting';
+    setHTML($('#cItem'), `
+      <div class="flex items-center justify-between mb-3">
+        <span class="chip" style="background:${c}26;color:#0f172a;border-color:${c}">${esc(it.category)}</span>
+        <span class="text-xs font-semibold ${live ? 'text-emerald-600' : 'text-slate-400'}">${live ? '● Voting open' : state.phase === 'result' ? 'Decision made' : 'Up for vote'} · Item ${state.idx + 1} of ${n}</span>
+      </div>
+      <div class="flex items-center gap-5">
+        <div class="w-24 h-24 xl:w-36 xl:h-36 shrink-0 rounded-3xl grid place-items-center text-6xl xl:text-8xl ${live ? 'glow' : ''}" style="background:${c}1f;border:2px solid ${c}66">${iconHTML(it.icon)}</div>
+        <div class="min-w-0 flex-1">
+          <h2 class="font-display text-2xl xl:text-4xl font-bold leading-tight text-slate-900">${esc(it.name)}</h2>
+          <div class="num text-3xl xl:text-5xl font-bold text-slate-900 mt-1">${fmt(it.cost)}</div>
+          <div class="text-sm text-slate-500 mt-0.5">${over ? '<span class="font-bold text-amber-600">More than the remaining budget, so it cannot be funded</span>' : pct + '% of the remaining budget'}</div>
+        </div>
+      </div>`);
+  }
+  function renderVote() {
+    const tl = tableList(), visible = tl.filter(t => t.online || t.voted), online = tl.filter(t => t.online).length;
+    const vs = votes?.[state.voteId] || {}, voted = state.phase === 'voting' || state.phase === 'result' ? Object.keys(vs).length : 0;
+    const total = Math.max(online, voted);
+    const chips = visible.length ? visible.map(t => {
+      const inVote = state.phase === 'voting' || state.phase === 'result';
+      const cls = t.voted ? 'bg-emerald-400/20 text-emerald-200 border-emerald-400/40' : t.online ? 'bg-white/5 text-slate-200 border-white/10' : 'bg-white/5 text-slate-500 border-white/5';
+      return `<span class="chip ${cls} !text-xs">${inVote ? (t.voted ? '✓' : '…') : '●'} ${esc(t.name)}</span>`;
+    }).join('') : `<span class="text-sm text-slate-400">No tables yet. Tables join with code <b class="text-white num tracking-widest">${esc(code)}</b>.</span>`;
+    let top = '';
+    if (state.phase === 'idle') {
+      const it = curItem();
+      top = `<div class="flex gap-3 items-stretch">
+        <button data-act="start" class="btn btn-green flex-1 !text-xl xl:!text-2xl !py-4 xl:!py-5 !rounded-2xl" ${it ? '' : 'disabled'}>▶ Start vote</button>
+        <select id="vDur" class="rounded-2xl bg-slate-800 text-white font-bold px-3 border border-white/10" aria-label="Vote length">${[15, 20, 30, 45, 60, 90].map(v => `<option value="${v}" ${v === durSec ? 'selected' : ''}>${v}s</option>`).join('')}</select>
+      </div><div class="text-xs text-slate-400 mt-2">Press Space to start · ${online} ${online === 1 ? 'table' : 'tables'} connected</div>`;
+    } else if (state.phase === 'voting') {
+      top = `<div class="flex items-center gap-5">
+        <div id="vTime" class="num text-7xl xl:text-8xl font-bold text-white leading-none w-28 xl:w-36 text-center">--</div>
+        <div class="flex-1 min-w-0">
+          <div class="text-sm font-semibold text-emerald-300 mb-2">Voting is open</div>
+          <div class="h-4 rounded-full bg-slate-700 overflow-hidden"><div id="vBar" class="h-full rounded-full bg-emerald-400" style="width:100%"></div></div>
+        </div></div>
+        <div class="mt-4 flex items-center justify-between gap-3">
+          <div><span class="num text-3xl font-bold text-white">${voted}</span><span class="text-slate-300 font-semibold"> of ${total} ${total === 1 ? 'table has' : 'tables have'} voted</span></div>
+          <button data-act="end" class="btn btn-ghost !py-2 text-sm">End vote now</button>
+        </div>
+        <div class="flex gap-1.5 mt-2">${Array.from({ length: Math.max(total, 1) }, (_, i) => `<div class="h-2 flex-1 rounded-full ${i < voted ? 'bg-emerald-400' : 'bg-slate-700'}"></div>`).join('')}</div>`;
+    } else if (state.phase === 'result') {
+      top = `<div class="flex items-center justify-between gap-3"><div class="text-slate-300 font-semibold">Result is on screen</div><button data-act="continue" class="btn btn-green">Continue</button></div>`;
+    } else {
+      top = `<div class="flex items-center justify-between gap-3"><div class="text-slate-300 font-semibold">Session complete</div><button data-act="summary" class="btn btn-green">View summary</button></div>`;
+    }
+    setHTML($('#cVote'), `${top}<div class="mt-4 pt-4 border-t border-white/10"><div class="flex flex-wrap gap-2">${chips}</div></div>`);
+    tick(true);
+  }
+  function renderNext() {
+    const up = state.queue.slice(state.idx + 1, state.idx + 7);
+    setHTML($('#cNext'), up.length && state.phase !== 'finished'
+      ? `<div class="text-xs font-semibold text-slate-400 mb-2">Up next</div><div class="flex gap-2 flex-wrap items-center">${up.map(q => `<div class="flex items-center gap-2 rounded-xl bg-white/5 border border-white/10 px-2.5 py-1.5" title="${esc(q.name)} · ${fmt(q.cost)}"><span class="text-xl leading-none">${iconHTML(q.icon)}</span><span class="text-xs font-semibold text-slate-300 max-w-[7rem] truncate">${esc(q.name)}</span></div>`).join('')}${state.queue.length - state.idx - 1 > 6 ? `<span class="text-xs text-slate-500">+${state.queue.length - state.idx - 7} more</span>` : ''}</div>` : '');
+  }
+  function renderCity() {
+    const { rows } = gridDims(state);
+    const visible = state.placed.filter(p => revealed.has(p.id));
+    const sig = rows + '|' + state.baseline + '|' + visible.map(p => p.id + ':' + p.slot).join(',');
+    const grid = $('#cGrid');
+    if (grid._sig !== sig) {
+      grid._sig = sig;
+      const cells = new Array(rows * COLS).fill(null);
+      if (state.baseline) baselineTiles(rows).forEach(t => { cells[t.r * COLS + t.c] = { ...t, base: true, id: 'base' + t.r + t.c }; });
+      visible.forEach(p => { let s = p.slot; if (s == null || cells[s]) s = cells.findIndex(x => !x); if (s >= 0) cells[s] = p; });
+      grid.innerHTML = `<div class="city-grid" style="grid-template-columns:repeat(${COLS},minmax(0,1fr));grid-template-rows:repeat(${rows},minmax(0,1fr))">${cells.map(c => {
+        if (!c) return '<div class="lot"></div>';
+        const col = catColor(c.category);
+        return `<div class="tile ${c.base ? 'tile-base' : ''} ${animateIds.has(c.id) ? 'tile-new' : ''}" style="--cb:${col}99;--c1:${col}4d;--c2:${col}14" title="${esc(c.name)}">
+          <div class="tile-icon">${iconHTML(c.icon)}</div><div class="tile-name">${esc(c.name)}</div>
+          ${c.base ? '<div class="tile-tag">Existing</div>' : `<div class="tile-cost">${fmtShort(c.cost)}</div>`}</div>`;
+      }).join('')}</div>`;
+    }
+    const n = visible.length, inv = visible.reduce((a, p) => a + p.cost, 0);
+    $('#cSub').textContent = `${cityTier(n)} · ${n === 0 ? 'nothing built yet. Every approved project lands here.' : n + ' ' + (n === 1 ? 'project' : 'projects') + ' built'}`;
+    setHTML($('#cStats'), `<span class="chip bg-emerald-400/15 text-emerald-300 border-emerald-400/30 !text-sm">${fmt(inv)} invested</span>`);
+    const counts = {}; visible.forEach(p => counts[p.category] = (counts[p.category] || 0) + 1);
+    setHTML($('#cLegend'), Object.entries(counts).map(([k, v]) => `<span class="chip !text-xs" style="background:${catColor(k)}22;color:#e2e8f0;border-color:${catColor(k)}66"><span class="w-2 h-2 rounded-full" style="background:${catColor(k)}"></span>${esc(k)} ${v}</span>`).join(''));
+  }
+  function renderOverlay() {
+    const el = $('#hOverlay');
+    let html = '', sig = '';
+    if (state.phase === 'result' && state.result) { sig = 'r' + state.result.voteId; html = resultOverlay(state.result); }
+    else if (state.phase === 'finished' && !finishedDismissed) { sig = 'f'; html = finishedOverlay(); }
+    if (el._sig === sig) return;
+    el._sig = sig; el.innerHTML = html;
+    if (sig[0] === 'r') {
+      resultShownAt = performance.now(); autoPaused = false;
+      chime(state.result.passed); if (state.result.passed) confetti();
+    } else if (sig === 'f') { confetti(120); chime(true); }
+  }
+  function resultOverlay(r) {
+    const tot = r.yes + r.no, yp = tot ? Math.round(r.yes / tot * 100) : 0, np = tot ? 100 - yp : 0, ok = r.passed, c = catColor(r.category);
+    return `<div class="fixed inset-0 z-[70] grid place-items-center p-4 md:p-8 bg-slate-950/80 backdrop-blur-md fade-in">
+      <div class="pop w-[min(96vw,1000px)] rounded-[2rem] overflow-hidden bg-white text-slate-900 shadow-2xl">
+        <div class="px-6 md:px-10 py-4 md:py-5 flex items-center justify-between gap-4 text-white ${ok ? 'bg-emerald-500' : 'bg-rose-500'}">
+          <div class="font-display font-bold text-2xl md:text-4xl">${ok ? '✓ Approved' : '✕ Not approved'}</div>
+          <div class="text-sm md:text-lg font-semibold text-right opacity-95">${esc(r.reason)}</div>
+        </div>
+        <div class="p-6 md:p-10 grid md:grid-cols-2 gap-8 items-center">
+          <div class="text-center">
+            <div class="mx-auto w-36 h-36 md:w-52 md:h-52 rounded-[2rem] grid place-items-center text-8xl md:text-9xl" style="background:${c}1f;border:3px solid ${c}77">${iconHTML(r.icon)}</div>
+            <h2 class="font-display text-2xl md:text-4xl font-bold mt-4 leading-tight">${esc(r.name)}</h2>
+            <div class="num text-2xl md:text-4xl font-bold mt-1 ${ok ? 'text-emerald-600' : 'text-slate-400 line-through'}">${fmt(r.cost)}</div>
+          </div>
+          <div>
+            <div class="text-sm font-semibold text-slate-500 mb-3">Final tally</div>
+            <div class="grid grid-cols-2 gap-4">
+              <div class="rounded-2xl bg-emerald-50 border-2 border-emerald-200 p-4 text-center"><div class="text-sm font-bold text-emerald-700">Yes</div><div class="num text-6xl md:text-8xl font-bold text-emerald-600 leading-none mt-1">${r.yes}</div></div>
+              <div class="rounded-2xl bg-rose-50 border-2 border-rose-200 p-4 text-center"><div class="text-sm font-bold text-rose-700">No</div><div class="num text-6xl md:text-8xl font-bold text-rose-600 leading-none mt-1">${r.no}</div></div>
+            </div>
+            ${tot ? `<div class="h-5 rounded-full bg-slate-100 overflow-hidden flex mt-5"><div class="grow bg-emerald-500" style="--w:${yp}%"></div><div class="grow bg-rose-500" style="--w:${np}%"></div></div>
+            <div class="flex justify-between text-sm font-bold mt-1.5"><span class="text-emerald-600">${yp}%</span><span class="text-rose-600">${np}%</span></div>` : ''}
+            <div class="text-sm text-slate-500 mt-3">${r.voted} of ${r.total} ${r.total === 1 ? 'table' : 'tables'} voted${ok ? ` · ${fmt(remaining(state))} left in the budget` : ''}</div>
+          </div>
+        </div>
+        ${state.autoContinue > 0 ? `<div id="autoBar" class="h-1.5 bg-slate-100"><div class="h-full bg-slate-800 drain" style="animation-duration:${state.autoContinue}s"></div></div>` : ''}
+        <div class="px-6 md:px-10 py-4 bg-slate-50 flex items-center justify-between gap-3">
+          <div class="text-sm text-slate-500">${ok ? 'Adding to the city…' : 'Moving to the next item…'}${state.autoContinue > 0 ? ' <button id="pauseBtn" data-act="pause" class="underline font-semibold ml-2">Pause</button>' : ''}</div>
+          <button data-act="continue" class="btn btn-dark !px-6 !py-3 !text-lg">${ok ? 'Add to city' : 'Next item'}</button>
+        </div>
+      </div></div>`;
+  }
+  function finishedOverlay() {
+    const ok = state.decisions.filter(d => d.passed), no = state.decisions.filter(d => !d.passed);
+    return `<div class="fixed inset-0 z-[70] grid place-items-center p-4 md:p-8 bg-slate-950/85 backdrop-blur-md fade-in">
+      <div class="pop w-[min(96vw,900px)] max-h-[92vh] overflow-auto rounded-[2rem] bg-white text-slate-900 shadow-2xl p-6 md:p-10">
+        <div class="text-center"><div class="text-6xl">🎉</div><h2 class="font-display text-3xl md:text-5xl font-bold mt-2">${esc(state.title)} is built</h2>
+          <p class="text-slate-500 mt-2">${cityTier(ok.length)} with ${ok.length} ${ok.length === 1 ? 'project' : 'projects'} funded.</p></div>
+        <div class="grid grid-cols-3 gap-3 md:gap-5 mt-7">
+          <div class="rounded-2xl bg-emerald-50 p-4 text-center"><div class="text-xs font-bold text-emerald-700">Left in budget</div><div class="num text-xl md:text-4xl font-bold text-emerald-600 mt-1">${fmt(remaining(state))}</div></div>
+          <div class="rounded-2xl bg-rose-50 p-4 text-center"><div class="text-xs font-bold text-rose-700">Spent</div><div class="num text-xl md:text-4xl font-bold text-rose-600 mt-1">${fmt(state.spent)}</div></div>
+          <div class="rounded-2xl bg-slate-100 p-4 text-center"><div class="text-xs font-bold text-slate-600">Rejected</div><div class="num text-xl md:text-4xl font-bold text-slate-700 mt-1">${no.length}</div></div>
+        </div>
+        <div class="mt-6 grid sm:grid-cols-2 gap-x-6 gap-y-1.5 text-sm">
+          ${state.decisions.map(d => `<div class="flex justify-between gap-3 py-1 border-b border-slate-100"><span class="truncate">${d.passed ? '✅' : '❌'} ${esc(d.name)}</span><span class="num font-semibold text-slate-500">${d.yes}–${d.no}</span></div>`).join('')}
+        </div>
+        <div class="flex gap-3 justify-center mt-8"><button data-act="closeSummary" class="btn btn-dark !px-6">View the city</button><button data-act="newSession" class="btn btn-light !px-6">New session</button></div>
+      </div></div>`;
+  }
+  function renderConn() {
+    const n = tableList().filter(t => t.online).length;
+    setHTML($('#hConn'), `<span class="inline-flex items-center gap-1.5"><span class="w-2 h-2 rounded-full ${connected ? 'bg-emerald-400' : 'bg-rose-500 animate-pulse'}"></span>${transport.mode === 'firebase' ? (connected ? 'Live sync' : 'Reconnecting…') : 'Local demo'}</span><span class="text-slate-500">|</span><span>${n} ${n === 1 ? 'table' : 'tables'} online</span>`);
+    $('#hSound').textContent = soundOn ? '🔊' : '🔇';
+  }
+  function renderAll() { renderBudget(); renderItem(); renderVote(); renderNext(); renderCity(); renderOverlay(); renderConn(); }
+
+  /* ---- timer / loop ---- */
+  function tick(renderOnly) {
+    const now = transport.now();
+    if (state.phase === 'voting') {
+      const left = Math.max(0, state.endsAt - now), sec = Math.ceil(left / 1000);
+      const t = $('#vTime'); if (t) { t.textContent = sec; t.className = t.className.replace(/text-(white|rose-400)/, sec <= 10 ? 'text-rose-400' : 'text-white'); }
+      const b = $('#vBar'); if (b) { b.style.width = (left / (state.durationMs || 1) * 100) + '%'; b.className = 'h-full rounded-full ' + (sec <= 10 ? 'bg-rose-400' : 'bg-emerald-400'); }
+      if (renderOnly) return;
+      if (sec <= 5 && sec > 0 && sec !== lastBeep) { lastBeep = sec; beep(880, .08, 'square', .04); }
+      if (left <= 0) { endVote(); return; }
+      if (state.autoEnd) {
+        const voted = Object.keys(votes?.[state.voteId] || {}).length, online = tableList().filter(x => x.online).length;
+        if (voted > 0 && voted >= online) { if (!allVotedAt) allVotedAt = now; else if (now - allVotedAt > 1200) endVote(); } else allVotedAt = 0;
+      }
+    } else if (state.phase === 'result' && !renderOnly) {
+      if (state.autoContinue > 0 && !autoPaused && performance.now() - resultShownAt > state.autoContinue * 1000) continueAfterResult();
+    }
+    if (!renderOnly && performance.now() - lastSlow > 1500) { lastSlow = performance.now(); renderVote(); renderConn(); }
+  }
+
+  /* ---- listeners ---- */
+  teardown.push(transport.on('tables', v => { tables = v || {}; renderVote(); renderConn(); }));
+  teardown.push(transport.on('votes', v => { votes = v || {}; renderVote(); }));
+  transport.onConnection(c => { connected = c; renderConn(); });
+  const beat = () => Promise.resolve(transport.set('hostSeen', transport.now())).catch(() => {});
+  beat(); const hb = setInterval(beat, HEARTBEAT_MS); teardown.push(() => clearInterval(hb));
+  const loop = setInterval(() => tick(false), 200); teardown.push(() => clearInterval(loop));
+
+  const onChange = e => { if (e.target.id === 'vDur') { durSec = +e.target.value; } };
+  const onClick = e => {
+    const b = e.target.closest('[data-act]'); if (!b) return;
+    b.blur && b.blur();
+    switch (b.dataset.act) {
+      case 'start': startVote(); break;
+      case 'end': endVote(); break;
+      case 'continue': continueAfterResult(); break;
+      case 'pause': autoPaused = true; $('#autoBar')?.remove(); $('#pauseBtn')?.remove(); break;
+      case 'skip': skipItem(); break;
+      case 'sound': soundOn = !soundOn; store.set('civic:sound', soundOn); renderConn(); beep(660); break;
+      case 'fs': if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen?.().catch(() => {}); break;
+      case 'summary': finishedDismissed = false; $('#hOverlay')._sig = null; renderOverlay(); break;
+      case 'closeSummary': finishedDismissed = true; renderOverlay(); $('#hOverlay').innerHTML = ''; $('#hOverlay')._sig = 'x'; break;
+      case 'newSession': if (confirm('Start a new session? This closes the current room.')) { transport.set('state', null); showSetup(); } break;
+      case 'join': openJoinModal(); break;
+      case 'menu': openMenu(); break;
+    }
+  };
+  const onKey = e => {
+    if (/^(INPUT|SELECT|TEXTAREA|BUTTON)$/.test(e.target.tagName)) return;
+    if (document.querySelector('.fixed.z-\\[80\\]')) return;
+    if ([' ', 'Enter', 'ArrowRight', 'PageDown'].includes(e.key)) {
+      e.preventDefault();
+      if (state.phase === 'idle') startVote(); else if (state.phase === 'result') continueAfterResult();
+      else if (state.phase === 'voting' && e.key === 'Enter' && e.shiftKey) endVote();
+    }
+  };
+  app.addEventListener('click', onClick); app.addEventListener('change', onChange); document.addEventListener('keydown', onKey);
+  teardown.push(() => { app.removeEventListener('click', onClick); app.removeEventListener('change', onChange); document.removeEventListener('keydown', onKey); });
+
+  function openMenu() {
+    const m = openModal(`<div class="p-6">
+      <div class="flex items-center justify-between mb-4"><h2 class="font-display text-xl font-bold">Session controls</h2><button data-close class="btn btn-light !px-3 !py-1.5">✕</button></div>
+      <div class="space-y-2">
+        <button id="mSkip" class="btn btn-light w-full !justify-start">↷ Skip current item (move it to the end of the queue)</button>
+        <button id="mFinish" class="btn btn-light w-full !justify-start">🏁 Finish session now</button>
+        <button id="mNew" class="btn btn-light w-full !justify-start">⟲ Close room and start a new setup</button>
+        <button id="mExit" class="btn btn-light w-full !justify-start">⏏ Leave to home screen (room stays open)</button>
+      </div></div>`);
+    $('#mSkip', m).onclick = () => { m.close(); skipItem(); };
+    $('#mFinish', m).onclick = () => { m.close(); if (state.phase === 'idle') finishSession(); else toast('Wait for the current vote to finish first'); };
+    $('#mNew', m).onclick = () => { m.close(); if (confirm('Close this room and start a new setup?')) { transport.set('state', null); store.del('civic:lastHost'); showSetup(); } };
+    $('#mExit', m).onclick = () => { m.close(); showLanding(); };
+  }
+  function openJoinModal() {
+    const url = location.href.split('#')[0] + '#join=' + code;
+    const m = openModal(`<div class="p-7 text-center">
+      <div class="flex justify-end"><button data-close class="btn btn-light !px-3 !py-1.5">✕</button></div>
+      <div class="text-slate-500 font-semibold">Open this page on your device, tap “Vote from a table” and enter</div>
+      <div class="num text-7xl md:text-8xl font-bold tracking-[.25em] text-slate-900 mt-2 pl-[.25em]">${esc(code)}</div>
+      <div id="qr" class="mx-auto mt-5 w-[220px] h-[220px] grid place-items-center"></div>
+      <div class="text-xs text-slate-500 mt-3 break-all">${esc(url)}</div>
+      ${transport.mode === 'local' ? '<div class="mt-4 text-sm rounded-xl bg-amber-50 text-amber-800 p-3">Local demo mode: only other tabs in this browser can join. Connect Firebase in ⚙ Sync settings (home screen) for real devices.</div>' : ''}
+    </div>`, 'max-w-md');
+    loadScript('https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js')
+      .then(() => { new QRCode($('#qr', m), { text: url, width: 220, height: 220, correctLevel: QRCode.CorrectLevel.M }); })
+      .catch(() => { $('#qr', m).innerHTML = '<div class="text-sm text-slate-400">QR code unavailable offline</div>'; });
+  }
+
+  renderAll(); tick(true);
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   TABLE VOTING SCREEN
+   ════════════════════════════════════════════════════════════════════════════ */
+async function showTable(code, name) {
+  cleanup();
+  app.innerHTML = splash('Joining room ' + code + '…');
+  let transport, state;
+  try { transport = await createTransport(code); teardown.push(() => transport.close()); }
+  catch (e) { showLanding('Could not start sync: ' + e.message); return; }
+  try { state = normalizeState(await timeout(transport.get('state'), 8000)); }
+  catch { showLanding('Could not reach the room. Check your connection and try again.'); return; }
+  if (!state) {
+    showLanding(`Room ${code} wasn’t found. Check the code on the main screen.` + (transport.mode === 'local' ? ' Local demo mode only reaches other tabs in this browser. Turn on live sync in ⚙ for separate devices.' : ''));
+    return;
+  }
+  store.set('civic:lastTable', { code, name });
+  const tid = slug(name);
+  const lockKey = vid => `civic:vote:${code}:${vid}:${tid}`;
+  let hostSeen = 0, connected = true, remoteVote = null, voteKey = null, unsubMine = null, acked = null, wasOver = false, lastHostOn = null, lastSlow = 0;
+
+  const reg = () => Promise.resolve(transport.set('tables/' + tid, { name, lastSeen: transport.now() })).catch(() => {});
+  reg(); const hb = setInterval(reg, HEARTBEAT_MS); teardown.push(() => clearInterval(hb));
+  teardown.push(() => unsubMine && unsubMine());
+
+  const myVote = () => (state && state.voteId && store.get(lockKey(state.voteId), null)) || remoteVote;
+  const hostOnline = () => transport.now() - hostSeen < STALE_MS;
+
+  function syncMine() {
+    if (!state || state.voteId === voteKey) return;
+    unsubMine && unsubMine(); voteKey = state.voteId; remoteVote = null; acked = null;
+    if (voteKey) unsubMine = transport.on(`votes/${voteKey}/${tid}`, v => { remoteVote = v || null; if (v) acked = voteKey; render(); });
+  }
+
+  app.innerHTML = `<div id="tRoot" class="min-h-screen bg-grid"></div>`;
+  const root = $('#tRoot');
+
+  function header() {
+    const on = connected && hostOnline();
+    return `<header class="flex items-center justify-between gap-3 px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-3">
+      <div class="flex items-center gap-2 min-w-0"><span class="chip bg-emerald-400 text-emerald-950 !text-sm !px-3 !py-1 truncate max-w-[12rem]">${esc(name)}</span><span class="num text-white font-bold tracking-widest">${esc(code)}</span></div>
+      <div class="flex items-center gap-3"><span class="inline-flex items-center gap-1.5 text-xs font-semibold ${on ? 'text-emerald-300' : 'text-amber-300'}"><span class="w-2 h-2 rounded-full ${on ? 'bg-emerald-400' : 'bg-amber-400 animate-pulse'}"></span>${!connected ? 'Reconnecting…' : hostOnline() ? 'Connected' : 'Host offline'}</span>
+      <button data-act="leave" class="text-xs text-slate-400 underline">Leave</button></div></header>`;
+  }
+  function budgetCard(extra = '') {
+    const rem = remaining(state), pct = Math.max(0, Math.min(100, rem / state.startingBudget * 100));
+    return `<div class="card p-5">
+      <div class="flex justify-between items-end gap-3">
+        <div><div class="text-xs font-semibold text-slate-500">City budget remaining</div><div class="num text-4xl md:text-5xl font-bold ${rem <= 0 ? 'text-rose-600' : 'text-emerald-600'}">${fmt(rem)}</div></div>
+        <div class="text-right"><div class="text-xs font-semibold text-slate-500">Spent</div><div class="num text-xl font-bold text-rose-600">${fmt(state.spent)}</div></div>
+      </div>
+      <div class="h-2.5 rounded-full bg-rose-100 overflow-hidden mt-3"><div class="h-full ${pct < 15 ? 'bg-amber-500' : 'bg-emerald-500'}" style="width:${pct}%"></div></div>${extra}</div>`;
+  }
+  function itemHeader(it, big) {
+    const c = catColor(it.category);
+    return `<div class="flex items-center gap-4"><div class="${big ? 'w-24 h-24 text-6xl' : 'w-16 h-16 text-4xl'} shrink-0 rounded-2xl grid place-items-center" style="background:${c}1f;border:2px solid ${c}66">${iconHTML(it.icon)}</div>
+      <div class="min-w-0"><span class="chip" style="background:${c}26;border-color:${c}">${esc(it.category)}</span><h2 class="font-display text-2xl md:text-3xl font-bold leading-tight mt-1">${esc(it.name)}</h2></div></div>`;
+  }
+  function cityStrip() {
+    const p = state.placed;
+    return `<div class="panel p-4 mt-auto"><div class="text-xs font-semibold text-slate-400 mb-2">Your city so far · ${p.length} ${p.length === 1 ? 'project' : 'projects'}</div>
+      <div class="flex flex-wrap gap-1.5">${p.length ? p.map(x => `<span class="w-10 h-10 rounded-xl grid place-items-center text-2xl" style="background:${catColor(x.category)}2e;border:1.5px solid ${catColor(x.category)}88" title="${esc(x.name)}">${iconHTML(x.icon)}</span>`).join('') : '<span class="text-sm text-slate-500">Nothing built yet.</span>'}</div></div>`;
+  }
+
+  function body() {
+    const s = state, it = s.queue[s.idx];
+    const mine = myVote();
+
+    if (s.phase === 'voting' && it) {
+      const rem = remaining(s), after = rem - it.cost, pct = Math.min(999, Math.round(it.cost / Math.max(rem, 1) * 100));
+      const over = transport.now() >= s.endsAt;
+      let action;
+      if (mine) {
+        action = `<div class="card p-6 text-center pop flex-1 grid place-items-center">
+          <div><div class="check-pop mx-auto w-24 h-24 rounded-full grid place-items-center text-6xl text-white ${mine === 'yes' ? 'bg-emerald-500' : 'bg-rose-500'}">✓</div>
+          <h3 class="font-display text-3xl font-bold mt-4">Vote locked!</h3>
+          <p class="text-lg mt-1">Your table voted <b class="${mine === 'yes' ? 'text-emerald-600' : 'text-rose-600'}">${mine === 'yes' ? 'YES' : 'NO'}</b></p>
+          <p class="text-slate-500 mt-3">Waiting for results<span class="dot-a">.</span><span class="dot-b">.</span><span class="dot-c">.</span></p>
+          <p class="text-xs mt-2 ${acked === s.voteId ? 'text-emerald-600' : 'text-amber-600'}">${acked === s.voteId || transport.mode === 'local' ? '✓ Received' : 'Sending…'}</p></div></div>`;
+      } else if (over) {
+        action = `<div class="card p-6 text-center flex-1 grid place-items-center"><div><div class="text-5xl mb-2">⏱️</div><h3 class="font-display text-2xl font-bold">Time’s up</h3><p class="text-slate-500 mt-1">Counting the votes…</p></div></div>`;
+      } else {
+        action = `<div class="grid grid-cols-2 gap-4 flex-1 min-h-[42vh]">
+          <button data-act="yes" class="vote-btn bg-emerald-500 text-4xl md:text-6xl"><span class="text-6xl md:text-8xl leading-none">👍</span>YES<span class="text-sm md:text-lg font-semibold opacity-90">Fund it</span></button>
+          <button data-act="no" class="vote-btn bg-rose-500 text-4xl md:text-6xl"><span class="text-6xl md:text-8xl leading-none">👎</span>NO<span class="text-sm md:text-lg font-semibold opacity-90">Pass on it</span></button></div>`;
+      }
+      return `<div class="card p-5 pop">${itemHeader(it, false)}
+          <div class="grid grid-cols-2 gap-3 mt-4">
+            <div class="rounded-2xl bg-slate-100 p-3"><div class="text-xs font-semibold text-slate-500">Cost</div><div class="num text-2xl font-bold">${fmt(it.cost)}</div><div class="text-xs text-slate-500">${pct}% of what’s left</div></div>
+            <div class="rounded-2xl ${after < 0 ? 'bg-amber-50' : 'bg-emerald-50'} p-3"><div class="text-xs font-semibold text-slate-500">Left if approved</div><div class="num text-2xl font-bold ${after < 0 ? 'text-amber-600' : 'text-emerald-600'}">${after < 0 ? 'Over budget' : fmt(after)}</div></div>
+          </div>
+          <div class="flex items-center gap-3 mt-4"><div class="num text-2xl font-bold w-12" id="tTime">--</div><div class="flex-1 h-3 rounded-full bg-slate-200 overflow-hidden"><div id="tBar" class="h-full rounded-full bg-emerald-500" style="width:100%"></div></div></div></div>
+        ${action}`;
+    }
+
+    if (s.phase === 'result' && s.result) {
+      const r = s.result;
+      return `<div class="rounded-[2rem] overflow-hidden pop ${r.passed ? 'bg-emerald-500' : 'bg-rose-500'} text-white p-6 text-center shadow-2xl">
+          <div class="text-6xl">${r.passed ? '🎉' : '✋'}</div>
+          <div class="font-display text-4xl md:text-5xl font-bold mt-1">${r.passed ? 'Passed!' : 'Did not pass'}</div>
+          <div class="font-semibold opacity-95 mt-1">${esc(r.reason)}</div></div>
+        <div class="card p-5 pop">${itemHeader(r, false)}
+          <div class="grid grid-cols-2 gap-3 mt-4">
+            <div class="rounded-2xl bg-emerald-50 p-3 text-center"><div class="text-xs font-bold text-emerald-700">Yes</div><div class="num text-4xl font-bold text-emerald-600">${r.yes}</div></div>
+            <div class="rounded-2xl bg-rose-50 p-3 text-center"><div class="text-xs font-bold text-rose-700">No</div><div class="num text-4xl font-bold text-rose-600">${r.no}</div></div></div>
+          <div class="text-sm text-slate-500 mt-3 text-center">${mine ? `Your table voted <b class="${mine === 'yes' ? 'text-emerald-600' : 'text-rose-600'}">${mine.toUpperCase()}</b>` : 'Your table didn’t vote on this one'} · ${r.passed ? `${fmt(r.cost)} added to the city` : 'Budget unchanged'}</div></div>
+        ${budgetCard()}`;
+    }
+
+    if (s.phase === 'finished') {
+      return `<div class="card p-6 text-center pop"><div class="text-6xl">🏆</div><h2 class="font-display text-3xl font-bold mt-2">Session complete</h2>
+        <p class="text-slate-500 mt-1">${s.placed.length} ${s.placed.length === 1 ? 'project was' : 'projects were'} funded, and ${fmt(remaining(s))} is left.</p></div>${budgetCard()}`;
+    }
+
+    // idle
+    const last = s.result && s.decisions.length
+      ? `<div class="panel p-4 flex items-center gap-3"><span class="text-2xl">${s.result.passed ? '✅' : '❌'}</span><div class="min-w-0"><div class="text-xs font-semibold text-slate-400">Last decision</div><div class="font-semibold text-white truncate">${esc(s.result.name)} ${s.result.passed ? 'passed' : 'did not pass'} (${s.result.yes}–${s.result.no})</div></div></div>` : '';
+    return `${budgetCard()}
+      <div class="card p-6 text-center pop"><div class="text-5xl mb-2">⏳</div><h2 class="font-display text-2xl font-bold">Waiting for the next vote</h2>
+        <p class="text-slate-500 mt-1">Keep this screen open. It updates the moment the host starts.</p>
+        ${it ? `<div class="mt-4 rounded-2xl bg-slate-100 p-3 flex items-center gap-3 text-left"><span class="text-3xl">${iconHTML(it.icon)}</span><div class="min-w-0"><div class="text-xs font-semibold text-slate-500">Up next</div><div class="font-bold truncate">${esc(it.name)}</div></div><div class="num font-bold ml-auto">${fmtShort(it.cost)}</div></div>` : ''}</div>${last}`;
+  }
+
+  function render() {
+    if (!state) { setHTML(root, `<div class="min-h-screen grid place-items-center p-6 text-center"><div><div class="text-5xl mb-3">👋</div><div class="text-white font-display text-2xl font-bold">The host closed this session</div><button data-act="leave" class="btn btn-green mt-5">Back to home</button></div></div>`); return; }
+    setHTML(root, `<div class="min-h-screen flex flex-col max-w-xl md:max-w-2xl mx-auto w-full">${header()}<main class="flex-1 flex flex-col gap-4 px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))]">${body()}${cityStrip()}</main></div>`);
+    tick();
+  }
+
+  function tick() {
+    if (!state) return;
+    if (state.phase === 'voting') {
+      const left = Math.max(0, state.endsAt - transport.now()), sec = Math.ceil(left / 1000);
+      const t = $('#tTime'); if (t) { t.textContent = sec; t.style.color = sec <= 10 ? '#e11d48' : ''; }
+      const b = $('#tBar'); if (b) { b.style.width = (left / (state.durationMs || 1) * 100) + '%'; b.className = 'h-full rounded-full ' + (sec <= 10 ? 'bg-rose-500' : 'bg-emerald-500'); }
+      const over = left <= 0; if (over !== wasOver) { wasOver = over; render(); }
+    } else wasOver = false;
+    const on = hostOnline(); if (on !== lastHostOn) { lastHostOn = on; render(); }
+  }
+
+  async function cast(choice) {
+    if (!state || state.phase !== 'voting' || myVote() || transport.now() >= state.endsAt) return;
+    const vid = state.voteId;
+    store.set(lockKey(vid), choice);
+    if (navigator.vibrate) navigator.vibrate(60);
+    render();
+    try { await transport.set(`votes/${vid}/${tid}`, choice); acked = vid; }
+    catch { store.del(lockKey(vid)); toast('Your vote didn’t send. Tap again to retry.', 'error'); }
+    render();
+  }
+
+  teardown.push(transport.on('state', v => { state = normalizeState(v); syncMine(); render(); }));
+  teardown.push(transport.on('hostSeen', v => { hostSeen = v || 0; const on = hostOnline(); if (on !== lastHostOn) { lastHostOn = on; render(); } }));
+  transport.onConnection(c => { connected = c; if (c) reg(); render(); });
+  const loop = setInterval(tick, 250); teardown.push(() => clearInterval(loop));
+
+  const onClick = e => {
+    const b = e.target.closest('[data-act]'); if (!b) return;
+    if (b.dataset.act === 'yes') cast('yes');
+    else if (b.dataset.act === 'no') cast('no');
+    else if (b.dataset.act === 'leave') { if (!state || confirm('Leave this room?')) showLanding(); }
+  };
+  app.addEventListener('click', onClick); teardown.push(() => app.removeEventListener('click', onClick));
+
+  syncMine(); render();
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   BOOT
+   ════════════════════════════════════════════════════════════════════════════ */
+showLanding();
+</script>
+</body>
+</html>
