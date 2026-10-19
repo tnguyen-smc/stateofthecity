@@ -132,6 +132,9 @@ const LOGO_SRC = 'citylogo.png';
 const COLS = 6;
 const HEARTBEAT_MS = 5000;
 const STALE_MS = 16000;
+const LATE_VOTE_GRACE_MS = 1500;   // after the timer hits 0, wait this long for votes still in flight on slow Wi-Fi
+const COMPACT_AT = 24;             // host panel switches to compact mode above this many tables
+const MAX_CHIPS = 40;              // never draw more than this many table chips on the host panel
 const KEY_DRAFT = 'civic:draft2';
 const KEY_LIB = 'civic:library2';
 
@@ -189,10 +192,12 @@ const uid = () => Math.random().toString(36).slice(2, 9);
 const genCode = () => { const a = 'ABCDEFGHJKMNPQRSTUVWXYZ'; let c = ''; for (let i = 0; i < 4; i++) c += a[Math.floor(Math.random() * a.length)]; return c; };
 const cleanCode = s => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
 const slug = s => String(s).toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'table';
+const sleep = ms => new Promise(r => setTimeout(r, ms));
 const timeout = (p, ms) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), ms))]);
 const toArr = v => Array.isArray(v) ? v.filter(Boolean) : (v && typeof v === 'object') ? Object.keys(v).sort((a, b) => a - b).map(k => v[k]) : [];
 const hash = str => { let h = 5381; for (let i = 0; i < str.length; i++) h = ((h << 5) + h + str.charCodeAt(i)) | 0; return Math.abs(h); };
-const natSort = (a, b) => a.name.localeCompare(b.name, undefined, { numeric: true });
+const natCollator = new Intl.Collator(undefined, { numeric: true });
+const natSort = (a, b) => natCollator.compare(a.name, b.name);
 const clone = o => JSON.parse(JSON.stringify(o));
 
 const mem = {};
@@ -221,6 +226,18 @@ function iconHTML(icon) {
   if (/^(https?:\/\/|data:image\/)/i.test(s))
     return `<img class="ico-img" src="${esc(s)}" alt="" referrerpolicy="no-referrer" onerror="this.replaceWith(document.createTextNode('📦'))">`;
   return `<span>${esc(s)}</span>`;
+}
+/** Keep the screen awake: a phone that auto-locks drops its connection and misses votes. Returns a release function. */
+function keepAwake() {
+  let lock = null, stopped = false;
+  const grab = async () => {
+    if (stopped || !('wakeLock' in navigator) || document.visibilityState !== 'visible') return;
+    try { lock = await navigator.wakeLock.request('screen'); lock.addEventListener('release', () => { lock = null; }); } catch {}
+  };
+  const onVis = () => { if (document.visibilityState === 'visible' && !lock) grab(); };
+  document.addEventListener('visibilitychange', onVis);
+  grab();
+  return () => { stopped = true; document.removeEventListener('visibilitychange', onVis); try { lock && lock.release(); } catch {} };
 }
 function setHTML(el, html) { if (el && el._h !== html) { el._h = html; el.innerHTML = html; } }
 
@@ -304,6 +321,20 @@ class FirebaseTransport {
   get(p) { return this.ref(p).once('value').then(s => s.val()); }
   on(p, cb) { const r = this.ref(p), h = s => cb(s.val()); r.on('value', h); return () => r.off('value', h); }
   onConnection(cb) { this.connCbs.push(cb); cb(this.connected); }
+  /** Atomically claim a table name. If another device already holds it, fall back to "Name 2", "Name 3"… so two
+      devices can never silently share (and overwrite) one vote. The same device re-joining keeps its name. */
+  async claimTable(name, dev) {
+    const base = String(name).trim().slice(0, 24);
+    for (let n = 1; n <= 99; n++) {
+      const cand = n === 1 ? base : base.slice(0, 20).trim() + ' ' + n, tid = slug(cand);
+      const res = await this.ref('tables/' + tid).transaction(cur => {
+        if (cur && cur.dev !== dev && this.now() - (cur.lastSeen || 0) < STALE_MS * 2) return;   // held by someone still connected → abort
+        return { name: cand, dev, lastSeen: this.now() };
+      });
+      if (res.committed) return { tid, name: cand };
+    }
+    throw new Error('no free table name');
+  }
   close() { this.connCbs = []; try { this._offRef.off(); this._conRef.off(); } catch {} }
 }
 async function createTransport(code) {
@@ -767,9 +798,10 @@ async function showHost(code, initial, isNew) {
     lastBeep = -1; allVotedAt = 0;
     commit(s => { s.phase = 'voting'; s.voteId = uid(); s.durationSec = durSec; s.durationMs = durSec * 1000; s.endsAt = transport.now() + durSec * 1000; s.result = null; });
   }
-  async function endVote() {
+  async function endVote(fromTimer) {
     if (state.phase !== 'voting' || ending) return;
     ending = true;
+    if (fromTimer) { await sleep(LATE_VOTE_GRACE_MS); if (state.phase !== 'voting') { ending = false; return; } }   // let in-flight votes land
     let vs = votes?.[state.voteId] || {};
     try { const fresh = await timeout(transport.get('votes/' + state.voteId), 2000); if (fresh) vs = fresh; } catch {}
     const item = curItem();
@@ -900,10 +932,17 @@ async function showHost(code, initial, isNew) {
     const vs = votes?.[state.voteId] || {}, voted = state.phase === 'voting' || state.phase === 'result' ? Object.keys(vs).length : 0;
     const total = Math.max(online, voted);
     const inVote = state.phase === 'voting' || state.phase === 'result';
-    const chips = visible.length ? visible.map(t => {
+    const crowded = visible.length > COMPACT_AT, voting = state.phase === 'voting';
+    const waiting = visible.filter(t => !t.voted).length;
+    // Crowded + mid-vote: list only who we are still waiting on (that is what the host needs); otherwise list everyone, capped.
+    const chipSrc = crowded && voting ? visible.filter(t => !t.voted) : visible;
+    const shown = chipSrc.slice(0, MAX_CHIPS), hidden = chipSrc.length - shown.length;
+    const chipSize = crowded ? '!text-[11px] !px-2 !py-0.5' : '!text-xs';
+    const chipHead = crowded && voting ? `<div class="text-xs font-semibold text-slate-300 mb-2">${waiting ? `Still waiting on ${waiting} ${waiting === 1 ? 'table' : 'tables'}` : 'Every table has voted'}</div>` : '';
+    const chips = visible.length ? shown.map(t => {
       const cls = t.voted ? 'bg-emerald-400/25 text-emerald-200 border-emerald-400/40' : t.online ? 'bg-white/5 text-slate-200 border-white/10' : 'bg-white/5 text-slate-400 border-white/5';
-      return `<span class="chip ${cls} !text-xs">${inVote ? (t.voted ? '✓' : '…') : '●'} ${esc(t.name)}</span>`;
-    }).join('') : `<span class="text-sm text-slate-300">No tables yet. Tables join with code <b class="text-white num tracking-widest">${esc(code)}</b>.</span>`;
+      return `<span class="chip ${cls} ${chipSize}">${inVote ? (t.voted ? '✓' : '…') : '●'} ${esc(t.name)}</span>`;
+    }).join('') + (hidden > 0 ? `<span class="chip bg-white/5 text-slate-300 border-white/10 ${chipSize}">+${hidden} more</span>` : '') : `<span class="text-sm text-slate-300">No tables yet. Tables join with code <b class="text-white num tracking-widest">${esc(code)}</b>.</span>`;
     let top = '';
     if (state.phase === 'idle') {
       top = `<div class="flex gap-3 items-stretch">
@@ -921,7 +960,7 @@ async function showHost(code, initial, isNew) {
           <div><span class="num text-3xl font-bold text-white">${voted}</span><span class="text-slate-300 font-semibold"> of ${total} ${total === 1 ? 'table has' : 'tables have'} voted</span></div>
           <button data-act="end" class="btn btn-ghost !py-2 text-sm">End vote now</button>
         </div>
-        <div class="flex gap-1.5 mt-2">${Array.from({ length: Math.max(total, 1) }, (_, i) => `<div class="h-2 flex-1 rounded-full ${i < voted ? 'bg-emerald-400' : 'bg-white/20'}"></div>`).join('')}</div>`;
+        <div class="flex ${total > COMPACT_AT ? 'gap-px' : 'gap-1.5'} mt-2">${Array.from({ length: Math.max(total, 1) }, (_, i) => `<div class="h-2 flex-1 rounded-full ${i < voted ? 'bg-emerald-400' : 'bg-white/20'}"></div>`).join('')}</div>`;
     } else if (state.phase === 'result') {
       const ok = state.result && state.result.passed;
       top = `<div class="flex items-center justify-between gap-3"><div class="text-slate-300 font-semibold">Result is on screen</div><button data-act="continue" class="btn btn-green">${ok ? 'Choose a spot' : 'Next item'}</button></div>`;
@@ -930,7 +969,7 @@ async function showHost(code, initial, isNew) {
     } else {
       top = `<div class="flex items-center justify-between gap-3"><div class="text-slate-300 font-semibold">Session complete</div><button data-act="summary" class="btn btn-green">View summary</button></div>`;
     }
-    setHTML($('#cVote'), `${top}<div class="mt-4 pt-4 border-t border-white/10"><div class="flex flex-wrap gap-2">${chips}</div></div>`);
+    setHTML($('#cVote'), `${top}<div class="mt-4 pt-4 border-t border-white/10">${chipHead}<div class="flex flex-wrap ${crowded ? 'gap-1.5' : 'gap-2'}">${chips}</div></div>`);
     tick(true);
   }
   function renderNext() {
@@ -1060,7 +1099,7 @@ async function showHost(code, initial, isNew) {
       const b = $('#vBar'); if (b) { b.style.width = (left / (state.durationMs || 1) * 100) + '%'; b.className = 'h-full rounded-full ' + (sec <= 10 ? 'bg-rose-400' : 'bg-emerald-400'); }
       if (renderOnly) return;
       if (sec <= 5 && sec > 0 && sec !== lastBeep) { lastBeep = sec; beep(880, .08, 'square', .04); }
-      if (left <= 0) { endVote(); return; }
+      if (left <= 0) { endVote(true); return; }
       if (state.autoEnd) {
         const voted = Object.keys(votes?.[state.voteId] || {}).length, online = tableList().filter(x => x.online).length;
         if (voted > 0 && voted >= online) { if (!allVotedAt) allVotedAt = now; else if (now - allVotedAt > 1200) endVote(); } else allVotedAt = 0;
@@ -1070,8 +1109,13 @@ async function showHost(code, initial, isNew) {
   }
 
   /* ---- listeners ---- */
-  teardown.push(transport.on('tables', v => { tables = v || {}; renderVote(); renderConn(); }));
-  teardown.push(transport.on('votes', v => { votes = v || {}; renderVote(); }));
+  // 50 tables heartbeat every 5 s and vote in a burst; coalesce the redraws instead of rebuilding the panel per message
+  let rvTimer = null;
+  const queueVoteRender = () => { if (rvTimer) return; rvTimer = setTimeout(() => { rvTimer = null; renderVote(); renderConn(); }, 120); };
+  teardown.push(() => clearTimeout(rvTimer));
+  teardown.push(transport.on('tables', v => { tables = v || {}; queueVoteRender(); }));
+  teardown.push(transport.on('votes', v => { votes = v || {}; queueVoteRender(); }));
+  teardown.push(keepAwake());
   transport.onConnection(c => { connected = c; renderConn(); });
   const beat = () => Promise.resolve(transport.set('hostSeen', transport.now())).catch(() => {});
   beat(); const hb = setInterval(beat, HEARTBEAT_MS); teardown.push(() => clearInterval(hb));
@@ -1161,13 +1205,23 @@ async function showTable(code, name) {
   try { state = normalizeState(await timeout(transport.get('state'), 9000)); }
   catch { showLanding('Could not reach the room. Check your connection and try again.'); return; }
   if (!state) { showLanding(`Room ${code} wasn’t found. Check the code on the main screen.`); return; }
-  const tid = slug(name);
+  const requestedName = name;
+  const dev = store.get('civic:dev', null) || (() => { const d = uid() + uid(); store.set('civic:dev', d); return d; })();
+  let claimed;
+  try { claimed = await timeout(transport.claimTable(name, dev), 9000); }
+  catch { showLanding('Could not register your table. Check your connection and try again.'); return; }
+  name = claimed.name;
+  const tid = claimed.tid;
+  if (name !== requestedName) toast(`“${requestedName}” was already taken, so you’re joined as “${name}”.`);
   const lockKey = vid => `civic:vote:${code}:${vid}:${tid}`;
   let hostSeen = 0, connected = true, remoteVote = null, voteKey = null, unsubMine = null, acked = null, wasOver = false, lastHostOn = null;
 
-  const reg = () => Promise.resolve(transport.set('tables/' + tid, { name, lastSeen: transport.now() })).catch(() => {});
+  const reg = () => Promise.resolve(transport.set('tables/' + tid, { name, dev, lastSeen: transport.now() })).catch(() => {});
   reg(); const hb = setInterval(reg, HEARTBEAT_MS); teardown.push(() => clearInterval(hb));
   teardown.push(() => unsubMine && unsubMine());
+  const onVisible = () => { if (document.visibilityState === 'visible') reg(); };   // phone just woke up → show as online right away
+  document.addEventListener('visibilitychange', onVisible); teardown.push(() => document.removeEventListener('visibilitychange', onVisible));
+  teardown.push(keepAwake());
 
   const myVote = () => (state && state.voteId && store.get(lockKey(state.voteId), null)) || remoteVote;
   const hostOnline = () => transport.now() - hostSeen < STALE_MS;
