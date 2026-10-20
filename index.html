@@ -456,7 +456,7 @@ function showHostLogin() {
   </div>`;
   const pw = $('#pw');
   const go = () => {
-    if (sha256hex(pw.value) === HOST_PW_SHA256) {
+    if (sha256hex(pw.value.trim()) === HOST_PW_SHA256) {
       hostOK = true; try { sessionStorage.setItem('civic:hostok', '1'); } catch {}
       showHostLanding();
     } else { $('#pwErr').textContent = 'That password isn’t right.'; pw.select(); }
