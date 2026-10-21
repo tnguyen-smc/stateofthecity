@@ -1380,6 +1380,15 @@ async function showTable(code, name) {
       <div class="flex flex-wrap gap-1.5">${p.length ? p.map(x => `<span class="w-10 h-10 rounded-xl grid place-items-center text-2xl" style="background:${catColor(x.category)}2e;border:1.5px solid ${catColor(x.category)}88" title="${esc(x.name)}">${iconHTML(x.icon)}</span>`).join('') : '<span class="text-sm text-slate-300">Nothing built yet.</span>'}</div></div>`;
   }
 
+  /** Slim 'Up next' row shown right under the YES/NO buttons while a vote is open. */
+  function nextPeek() {
+    const up = state.queue.slice(state.idx + 1, state.idx + 4);
+    if (!up.length) return '';
+    return `<div class="card px-3 py-2.5 flex items-center gap-3">
+      <span class="text-xs font-bold text-slate-500 shrink-0">Up next</span>
+      <div class="flex gap-2 overflow-x-auto min-w-0 flex-1">${up.map(q => `<span class="shrink-0 inline-flex items-center gap-1.5 rounded-xl bg-slate-100 px-2.5 py-1.5"><span class="text-xl leading-none">${iconHTML(q.icon)}</span><span class="text-xs font-semibold text-slate-700 max-w-[7rem] truncate">${esc(q.name)}</span><span class="num text-xs font-bold text-slate-500">${fmtShort(q.cost)}</span></span>`).join('')}</div></div>`;
+  }
+
   /** Items still to be voted on. While waiting (idle) the next item counts; once voting/result it is already underway. */
   function queueStrip() {
     const s = state, left = s.phase === 'finished' ? [] : s.queue.slice(s.phase === 'idle' || s.phase === 'lobby' ? s.idx : s.idx + 1);
@@ -1408,7 +1417,7 @@ async function showTable(code, name) {
       } else if (over) {
         action = `<div class="card p-6 text-center flex-1 grid place-items-center"><div><div class="text-5xl mb-2">⏱️</div><h3 class="font-display text-2xl font-semibold">Time’s up</h3><p class="text-slate-500 mt-1">Counting the votes…</p></div></div>`;
       } else {
-        action = `<div class="grid grid-cols-2 gap-3 sm:gap-4 flex-1 min-h-[220px]">
+        action = `<div class="grid grid-cols-2 gap-3 sm:gap-4 flex-1 min-h-[200px]">
           <button data-act="yes" class="vote-btn bg-emerald-500 text-3xl sm:text-4xl md:text-6xl"><span class="text-5xl sm:text-6xl md:text-8xl leading-none">👍</span>YES<span class="text-sm md:text-lg font-semibold opacity-90">Fund it</span></button>
           <button data-act="no" class="vote-btn bg-rose-500 text-3xl sm:text-4xl md:text-6xl"><span class="text-5xl sm:text-6xl md:text-8xl leading-none">👎</span>NO<span class="text-sm md:text-lg font-semibold opacity-90">Pass on it</span></button></div>`;
       }
@@ -1418,7 +1427,7 @@ async function showTable(code, name) {
             <div class="rounded-2xl ${after < 0 ? 'bg-amber-50' : 'bg-emerald-50'} p-2.5 sm:p-3"><div class="text-xs font-semibold text-slate-500">Left if approved</div><div class="num fit-num font-bold ${after < 0 ? 'text-amber-600' : 'text-emerald-600'}">${after < 0 ? 'Over budget' : fmt(after)}</div></div>
           </div>
           <div class="flex items-center gap-3 mt-3 sm:mt-4"><div class="num text-2xl font-bold w-12" id="tTime">--</div><div class="flex-1 h-3 rounded-full bg-slate-200 overflow-hidden"><div id="tBar" class="h-full rounded-full bg-emerald-500" style="width:100%"></div></div></div></div>
-        ${action}`;
+        ${action}${nextPeek()}`;
     }
 
     if ((s.phase === 'result' || s.phase === 'placing') && s.result) {
@@ -1457,7 +1466,7 @@ async function showTable(code, name) {
 
   function render() {
     if (!state) { setHTML(root, `<div class="min-h-[100dvh] grid place-items-center p-6 text-center"><div><div class="text-5xl mb-3">👋</div><div class="text-slate-700 font-display text-2xl font-semibold">The host closed this session</div><button data-act="leave" class="btn btn-green mt-5">Back to home</button></div></div>`); return; }
-    setHTML(root, `<div class="min-h-[100dvh] flex flex-col max-w-xl md:max-w-2xl mx-auto w-full">${header()}<main class="flex-1 flex flex-col gap-3 sm:gap-4 px-3 sm:px-4 pb-[max(1rem,env(safe-area-inset-bottom))]">${body()}${state.phase === 'lobby' || state.phase === 'voting' ? '' : cityStrip() + queueStrip()}</main></div>`);
+    setHTML(root, `<div class="min-h-[100dvh] flex flex-col max-w-xl md:max-w-2xl mx-auto w-full">${header()}<main class="flex-1 flex flex-col gap-3 sm:gap-4 px-3 sm:px-4 pb-[max(1rem,env(safe-area-inset-bottom))]">${body()}${state.phase === 'lobby' ? '' : (state.phase === 'voting' ? '' : cityStrip()) + queueStrip()}</main></div>`);
     tick();
   }
   function tick() {
