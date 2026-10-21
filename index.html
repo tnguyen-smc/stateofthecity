@@ -1132,7 +1132,7 @@ async function showHost(code, initial, isNew) {
   let lobbyBuilt = false;
   const lobbySeen = new Set();
 
-  /* ---- lobby music (host screen only; ourcity.mp3 in the site root) ---- */
+  /* ---- background music (host screen only; ourcity.mp3 in the site root). Plays from the lobby through the whole game. ---- */
   let music = null, fadeTimer = null, unlockFn = null;
   function stopUnlock() { if (unlockFn) { document.removeEventListener('pointerdown', unlockFn); document.removeEventListener('keydown', unlockFn); unlockFn = null; } }
   function startMusic() {
@@ -1140,7 +1140,7 @@ async function showHost(code, initial, isNew) {
     music = new Audio('ourcity.mp3'); music.loop = true; music.volume = .6; music.muted = !soundOn;
     const p = music.play();
     if (p && p.catch) p.catch(() => {                    // browser blocked autoplay → start on the host's next tap or key press
-      unlockFn = () => { stopUnlock(); if (music && state.phase === 'lobby') music.play().catch(() => {}); };
+      unlockFn = () => { stopUnlock(); if (music) music.play().catch(() => {}); };
       document.addEventListener('pointerdown', unlockFn); document.addEventListener('keydown', unlockFn);
     });
   }
@@ -1153,9 +1153,9 @@ async function showHost(code, initial, isNew) {
   teardown.push(() => stopMusic(false));
   function renderLobby() {
     const el = $('#hLobby'); if (!el) return;
-    if (state.phase !== 'lobby') { if (lobbyBuilt) { el.innerHTML = ''; lobbyBuilt = false; lobbySeen.clear(); stopMusic(true); } return; }
+    if (state.phase !== 'lobby') { if (lobbyBuilt) { el.innerHTML = ''; lobbyBuilt = false; lobbySeen.clear(); } return; }
     if (!lobbyBuilt) {
-      lobbyBuilt = true; startMusic();
+      lobbyBuilt = true;
       const url = joinDirectURL(code), clean = joinPageURL();
       el.innerHTML = `
       <div class="fixed inset-0 z-[60] flex flex-col bg-grid fade-in overflow-y-auto">
@@ -1201,7 +1201,7 @@ async function showHost(code, initial, isNew) {
     commit(s => { s.phase = 'idle'; });
   }
 
-  function renderAll() { renderBudget(); renderItem(); renderVote(); renderNext(); renderCity(); renderBar(); renderOverlay(); renderLobby(); renderConn(); }
+  function renderAll() { startMusic(); renderBudget(); renderItem(); renderVote(); renderNext(); renderCity(); renderBar(); renderOverlay(); renderLobby(); renderConn(); }
 
   /* ---- timer / loop ---- */
   function tick(renderOnly) {
