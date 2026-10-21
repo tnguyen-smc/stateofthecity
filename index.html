@@ -91,6 +91,13 @@
   .tile-base { filter: saturate(.3); opacity:.88; }
   .ico-img { width:1em; height:1em; object-fit:contain; border-radius:.2em; display:block; }
 
+  /* ---- Lobby (host screen, before the game starts) ---- */
+  #lQr img, #lQr canvas { width:100% !important; height:100% !important; }
+  #lQr img { display:block; border-radius:.5rem; }
+  .lobby-chip { display:inline-flex; align-items:center; gap:.55rem; background:#fff; border:1px solid #e0e1dc; border-radius:.9rem; padding:.45rem .95rem; font-weight:700; color:#4a4b4d; box-shadow:0 8px 18px -14px rgba(56,57,59,.55); max-width:100%; }
+  .lobby-chip i { width:.6rem; height:.6rem; border-radius:999px; background:#8dc63f; flex:none; box-shadow:0 0 0 3px rgba(141,198,63,.25); }
+  .lobby-chip span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
   /* ---- Motion ---- */
   @keyframes drop { 0%{transform:translateY(-140px) scale(1.3);opacity:0} 55%{transform:translateY(8px) scale(.97);opacity:1} 75%{transform:translateY(-7px) scale(1.02)} 100%{transform:none;opacity:1} }
   @keyframes ring { 0%{box-shadow:0 0 0 0 rgba(141,198,63,.9)} 100%{box-shadow:0 0 0 34px rgba(141,198,63,0)} }
@@ -715,7 +722,7 @@ async function showSetup() {
         showHost(code, {
           v: 2, code, title: (draft.title || '').trim() || 'Our City', startingBudget: draft.budget, spent: 0, baseline: !!draft.baseline,
           autoEnd: !!draft.autoEnd, durationSec: +draft.duration || 30, queue, idx: 0, placed, decisions: [], pending: null, extraRows: 0,
-          phase: 'idle', voteId: null, endsAt: null, durationMs: 0, result: null, rev: 0, createdAt: Date.now()
+          phase: 'lobby', voteId: null, endsAt: null, durationMs: 0, result: null, rev: 0, createdAt: Date.now()
         }, true);
         return;
       }
@@ -812,7 +819,8 @@ async function showHost(code, initial, isNew) {
       </section>
     </main>
   </div>
-  <div id="hOverlay"></div>`;
+  <div id="hOverlay"></div>
+  <div id="hLobby"></div>`;
 
   function commit(fn) {
     fn(state); state.rev = (state.rev || 0) + 1;
@@ -990,6 +998,8 @@ async function showHost(code, initial, isNew) {
           <button data-act="end" class="btn btn-ghost !py-2 text-sm">End vote now</button>
         </div>
         <div class="flex ${total > COMPACT_AT ? 'gap-px' : 'gap-1.5'} mt-2">${Array.from({ length: Math.max(total, 1) }, (_, i) => `<div class="h-2 flex-1 rounded-full ${i < voted ? 'bg-emerald-400' : 'bg-white/20'}"></div>`).join('')}</div>`;
+    } else if (state.phase === 'lobby') {
+      top = `<div class="text-slate-200 font-semibold">Waiting in the lobby</div><div class="text-sm text-slate-300 mt-1">${online} ${online === 1 ? 'table has' : 'tables have'} joined so far.</div>`;
     } else if (state.phase === 'result') {
       const ok = state.result && state.result.passed;
       top = `<div class="flex items-center justify-between gap-3"><div class="text-slate-300 font-semibold">Result is on screen</div><button data-act="continue" class="btn btn-green">${ok ? 'Choose a spot' : 'Next item'}</button></div>`;
@@ -1116,8 +1126,82 @@ async function showHost(code, initial, isNew) {
     const n = tableList().filter(t => t.online).length;
     setHTML($('#hConn'), `<span class="inline-flex items-center gap-1.5"><span class="w-2 h-2 rounded-full ${connected ? 'bg-emerald-400' : 'bg-rose-500 animate-pulse'}"></span>${connected ? 'Live sync' : 'Reconnecting…'}</span><span class="text-slate-400">|</span><span>${n} ${n === 1 ? 'table' : 'tables'} online</span>`);
     $('#hSound').textContent = soundOn ? '🔊' : '🔇';
+    const ls = $('#lSound'); if (ls) ls.textContent = soundOn ? '🔊' : '🔇';
   }
-  function renderAll() { renderBudget(); renderItem(); renderVote(); renderNext(); renderCity(); renderBar(); renderOverlay(); renderConn(); }
+  /* ---- lobby: big QR, live participant list, Start Game ---- */
+  let lobbyBuilt = false;
+  const lobbySeen = new Set();
+
+  /* ---- lobby music (host screen only; ourcity.mp3 in the site root) ---- */
+  let music = null, fadeTimer = null, unlockFn = null;
+  function stopUnlock() { if (unlockFn) { document.removeEventListener('pointerdown', unlockFn); document.removeEventListener('keydown', unlockFn); unlockFn = null; } }
+  function startMusic() {
+    if (music) return;
+    music = new Audio('ourcity.mp3'); music.loop = true; music.volume = .6; music.muted = !soundOn;
+    const p = music.play();
+    if (p && p.catch) p.catch(() => {                    // browser blocked autoplay → start on the host's next tap or key press
+      unlockFn = () => { stopUnlock(); if (music && state.phase === 'lobby') music.play().catch(() => {}); };
+      document.addEventListener('pointerdown', unlockFn); document.addEventListener('keydown', unlockFn);
+    });
+  }
+  function stopMusic(fade) {
+    stopUnlock(); clearInterval(fadeTimer);
+    const a = music; music = null; if (!a) return;
+    if (!fade) { a.pause(); return; }
+    fadeTimer = setInterval(() => { a.volume = Math.max(0, a.volume - .06); if (a.volume <= 0) { clearInterval(fadeTimer); a.pause(); } }, 80);
+  }
+  teardown.push(() => stopMusic(false));
+  function renderLobby() {
+    const el = $('#hLobby'); if (!el) return;
+    if (state.phase !== 'lobby') { if (lobbyBuilt) { el.innerHTML = ''; lobbyBuilt = false; lobbySeen.clear(); stopMusic(true); } return; }
+    if (!lobbyBuilt) {
+      lobbyBuilt = true; startMusic();
+      const url = joinDirectURL(code), clean = joinPageURL();
+      el.innerHTML = `
+      <div class="fixed inset-0 z-[60] flex flex-col bg-grid fade-in overflow-y-auto">
+        <div class="shrink-0 px-6 md:px-10 pt-6 md:pt-8 flex items-start justify-between gap-4">
+          <div class="min-w-0 flex flex-col gap-4">
+            <div class="min-w-0">${logoImg(64)}<div class="wordmark text-2xl md:text-4xl text-slate-600 mt-3 truncate">${esc(state.title)}</div></div>
+            <div class="self-start inline-flex items-center gap-4 rounded-2xl bg-white border border-slate-200 px-5 py-3 shadow-sm">
+              <span class="text-sm md:text-base font-semibold text-slate-500">Participants</span>
+              <span id="lCount" class="num text-4xl md:text-5xl font-bold text-emerald-600 leading-none">0</span>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 shrink-0">
+            <button data-act="sound" id="lSound" class="btn btn-ghost !py-2 !px-3" title="Music and sound on/off">${soundOn ? '🔊' : '🔇'}</button>
+            <button data-act="menu" class="btn btn-ghost !py-2 !px-3" title="Session menu">⋯</button>
+            <button data-act="begin" class="btn btn-green !text-xl md:!text-3xl !py-4 md:!py-5 !px-8 md:!px-12 !rounded-2xl">Start Game ▶</button>
+          </div>
+        </div>
+        <div class="flex-1 min-h-0 flex flex-col items-center justify-center px-6 py-4">
+          <div class="font-display text-3xl md:text-5xl font-semibold text-slate-700">Scan to Join</div>
+          <div class="card p-4 md:p-6 mt-4 md:mt-5"><div id="lQr" class="grid place-items-center" style="width:min(46vh,82vw);height:min(46vh,82vw)"></div></div>
+          <div class="mt-4 text-slate-500 text-sm md:text-lg text-center">Or go to <b class="text-slate-700">${esc(clean.replace(/^https?:\/\//, ''))}</b> and enter code
+            <span class="num font-bold text-slate-900 tracking-[.25em] text-2xl md:text-4xl align-middle ml-2">${esc(code)}</span></div>
+        </div>
+        <div class="shrink-0 px-6 md:px-10 pb-6 md:pb-8"><div id="lNames" class="flex flex-wrap justify-center gap-2 max-h-[22vh] overflow-y-auto"></div></div>
+      </div>`;
+      const box = $('#lQr', el), size = 560;
+      loadScript('https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js')
+        .then(() => { if (!lobbyBuilt || !box.isConnected) return; new QRCode(box, { text: url, width: size, height: size, colorDark: '#2a2b2c', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.M }); })
+        .catch(() => { box.innerHTML = '<div class="text-sm text-slate-400 text-center">QR code unavailable.<br>Use the link below.</div>'; });
+    }
+    const list = tableList().filter(t => t.online), CAP = 60, shown = list.slice(0, CAP), hidden = list.length - shown.length;
+    const big = list.length > 24;
+    $('#lCount').textContent = list.length;
+    setHTML($('#lNames'), list.length
+      ? shown.map(t => { const isNew = !lobbySeen.has(t.id); lobbySeen.add(t.id);
+          return `<div class="lobby-chip ${isNew ? 'pop' : ''} ${big ? '!text-sm !py-1 !px-3' : 'text-base md:text-xl'}"><i></i><span>${esc(t.name)}</span></div>`; }).join('')
+        + (hidden > 0 ? `<div class="lobby-chip !bg-slate-100 ${big ? '!text-sm' : ''}"><span>+${hidden} more</span></div>` : '')
+      : `<div class="text-slate-500 font-semibold text-base md:text-xl py-3">Waiting for tables to join<span class="dot-a">.</span><span class="dot-b">.</span><span class="dot-c">.</span></div>`);
+  }
+  function beginGame() {
+    if (state.phase !== 'lobby') return;
+    beep(520, .1); setTimeout(() => beep(780, .14), 110);
+    commit(s => { s.phase = 'idle'; });
+  }
+
+  function renderAll() { renderBudget(); renderItem(); renderVote(); renderNext(); renderCity(); renderBar(); renderOverlay(); renderLobby(); renderConn(); }
 
   /* ---- timer / loop ---- */
   function tick(renderOnly) {
@@ -1134,13 +1218,13 @@ async function showHost(code, initial, isNew) {
         if (voted > 0 && voted >= online) { if (!allVotedAt) allVotedAt = now; else if (now - allVotedAt > 1200) endVote(); } else allVotedAt = 0;
       }
     }
-    if (!renderOnly && performance.now() - lastSlow > 1500) { lastSlow = performance.now(); renderVote(); renderConn(); }
+    if (!renderOnly && performance.now() - lastSlow > 1500) { lastSlow = performance.now(); renderVote(); renderLobby(); renderConn(); }
   }
 
   /* ---- listeners ---- */
   // 50 tables heartbeat every 5 s and vote in a burst; coalesce the redraws instead of rebuilding the panel per message
   let rvTimer = null;
-  const queueVoteRender = () => { if (rvTimer) return; rvTimer = setTimeout(() => { rvTimer = null; renderVote(); renderConn(); }, 120); };
+  const queueVoteRender = () => { if (rvTimer) return; rvTimer = setTimeout(() => { rvTimer = null; renderVote(); renderLobby(); renderConn(); }, 120); };
   teardown.push(() => clearTimeout(rvTimer));
   teardown.push(transport.on('tables', v => { tables = v || {}; queueVoteRender(); }));
   teardown.push(transport.on('votes', v => { votes = v || {}; queueVoteRender(); }));
@@ -1157,6 +1241,7 @@ async function showHost(code, initial, isNew) {
     const b = e.target.closest('[data-act]'); if (!b) return;
     b.blur && b.blur();
     switch (b.dataset.act) {
+      case 'begin': beginGame(); break;
       case 'start': startVote(); break;
       case 'end': endVote(); break;
       case 'continue': afterResult(); break;
@@ -1165,7 +1250,7 @@ async function showHost(code, initial, isNew) {
       case 'cancelmove': moveSel = null; renderCity(); renderBar(); break;
       case 'addrow': addRow(); break;
       case 'delrow': delRow(); break;
-      case 'sound': soundOn = !soundOn; store.set('civic:sound', soundOn); renderConn(); beep(660); break;
+      case 'sound': soundOn = !soundOn; store.set('civic:sound', soundOn); if (music) music.muted = !soundOn; renderConn(); beep(660); break;
       case 'fs': if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen?.().catch(() => {}); break;
       case 'summary': finishedDismissed = false; $('#hOverlay')._sig = null; renderOverlay(); break;
       case 'closeSummary': finishedDismissed = true; $('#hOverlay')._sig = null; renderOverlay(); break;
@@ -1296,7 +1381,7 @@ async function showTable(code, name) {
 
   /** Items still to be voted on. While waiting (idle) the next item counts; once voting/result it is already underway. */
   function queueStrip() {
-    const s = state, left = s.phase === 'finished' ? [] : s.queue.slice(s.phase === 'idle' ? s.idx : s.idx + 1);
+    const s = state, left = s.phase === 'finished' ? [] : s.queue.slice(s.phase === 'idle' || s.phase === 'lobby' ? s.idx : s.idx + 1);
     if (!left.length) return '';
     const CAP = 10, shown = left.slice(0, CAP);
     return `<div class="card p-4"><div class="text-xs font-semibold text-slate-500 mb-2">Still to vote on · ${left.length} ${left.length === 1 ? 'item' : 'items'}</div>
@@ -1355,6 +1440,12 @@ async function showTable(code, name) {
         <p class="text-slate-500 mt-1">${builtItems(s).length} ${builtItems(s).length === 1 ? 'project was' : 'projects were'} funded, and ${fmt(remaining(s))} is left.</p></div>${budgetCard()}`;
     }
 
+    if (s.phase === 'lobby') {
+      return `<div class="card p-8 text-center pop mt-2"><div class="text-6xl mb-3">👋</div><h2 class="font-display text-3xl font-semibold">You’re in!</h2>
+        <p class="text-slate-500 mt-2">Joined as <b class="text-slate-700">${esc(name)}</b></p>
+        <p class="text-slate-500 mt-4">Waiting for the host to start the game<span class="dot-a">.</span><span class="dot-b">.</span><span class="dot-c">.</span></p>
+        <p class="text-xs text-slate-400 mt-3">Keep this screen open. It updates the moment the game begins.</p></div>`;
+    }
     const last = s.result && s.decisions.length
       ? `<div class="panel p-4 flex items-center gap-3"><span class="text-2xl">${s.result.passed ? '✅' : '❌'}</span><div class="min-w-0"><div class="text-xs font-semibold text-slate-300">Last decision</div><div class="font-semibold text-white truncate">${esc(s.result.name)} ${s.result.passed ? 'passed' : 'did not pass'} (${s.result.yes}–${s.result.no})</div></div></div>` : '';
     return `${budgetCard()}
@@ -1365,7 +1456,7 @@ async function showTable(code, name) {
 
   function render() {
     if (!state) { setHTML(root, `<div class="min-h-screen grid place-items-center p-6 text-center"><div><div class="text-5xl mb-3">👋</div><div class="text-slate-700 font-display text-2xl font-semibold">The host closed this session</div><button data-act="leave" class="btn btn-green mt-5">Back to home</button></div></div>`); return; }
-    setHTML(root, `<div class="min-h-screen flex flex-col max-w-xl md:max-w-2xl mx-auto w-full">${header()}<main class="flex-1 flex flex-col gap-4 px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))]">${body()}${cityStrip()}${queueStrip()}</main></div>`);
+    setHTML(root, `<div class="min-h-screen flex flex-col max-w-xl md:max-w-2xl mx-auto w-full">${header()}<main class="flex-1 flex flex-col gap-4 px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))]">${body()}${state.phase === 'lobby' ? '' : cityStrip() + queueStrip()}</main></div>`);
     tick();
   }
   function tick() {
