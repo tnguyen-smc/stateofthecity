@@ -1161,27 +1161,24 @@ async function showHost(code, initial, isNew) {
       const url = joinDirectURL(code), clean = joinPageURL();
       el.innerHTML = `
       <div class="fixed inset-0 z-[60] flex flex-col bg-grid fade-in overflow-y-auto">
-        <div class="shrink-0 px-6 md:px-10 pt-6 md:pt-8 flex items-start justify-between gap-4">
-          <div class="min-w-0 flex flex-col gap-4">
-            <div class="min-w-0">${logoImg(64)}<div class="wordmark text-2xl md:text-4xl text-slate-600 mt-3 truncate">${esc(state.title)}</div></div>
-            <div class="self-start inline-flex items-center gap-4 rounded-2xl bg-white border border-slate-200 px-5 py-3 shadow-sm">
-              <span class="text-sm md:text-base font-semibold text-slate-500">Participants</span>
-              <span id="lCount" class="num text-4xl md:text-5xl font-bold text-emerald-600 leading-none">0</span>
-            </div>
-          </div>
-          <div class="flex items-center gap-2 shrink-0">
+        <div class="shrink-0 px-6 md:px-10 pt-6 md:pt-8 grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-x-8 gap-y-3 items-start">
+          <div class="min-w-0 md:col-start-1 md:row-start-1">${logoImg(64)}</div>
+          <div class="flex items-center gap-2 shrink-0 md:col-start-3 md:row-start-1 md:justify-self-end">
             <button data-act="sound" id="lSound" class="btn btn-ghost !py-2 !px-3" title="Music and sound on/off">${soundOn ? '🔊' : '🔇'}</button>
             <button data-act="menu" class="btn btn-ghost !py-2 !px-3" title="Session menu">⋯</button>
             <button data-act="begin" class="btn btn-green !text-xl md:!text-3xl !py-4 md:!py-5 !px-8 md:!px-12 !rounded-2xl">Start Game ▶</button>
           </div>
-        </div>
-        <div class="flex-1 min-h-0 flex flex-col items-center justify-center px-6 py-4">
-          <div class="font-display text-3xl md:text-5xl font-semibold text-slate-700">Scan to Join</div>
-          <div class="card p-3 md:p-4 mt-3 md:mt-4"><div id="lQr" class="grid place-items-center" style="width:min(32vh,68vw);height:min(32vh,68vw)"></div></div>
-          <div class="mt-4 text-slate-500 text-sm md:text-lg text-center">Or go to <b class="text-slate-700">${esc(clean.replace(/^https?:\/\//, ''))}</b> and enter code
+          <div class="min-w-0 md:col-start-1 md:row-start-2 md:self-center wordmark text-2xl md:text-4xl text-slate-600 truncate">${esc(state.title)}</div>
+          <div class="md:col-start-2 md:row-start-2 md:self-center text-center font-display text-3xl md:text-5xl font-semibold text-slate-700 leading-tight">Scan to Join</div>
+          <div class="md:col-start-1 md:row-start-3 inline-flex items-center gap-4 rounded-2xl bg-white border border-slate-200 px-5 py-3 shadow-sm justify-self-start">
+            <span class="text-sm md:text-base font-semibold text-slate-500">Participants</span>
+            <span id="lCount" class="num text-4xl md:text-5xl font-bold text-emerald-600 leading-none">0</span>
+          </div>
+          <div class="md:col-start-2 md:row-start-3 justify-self-center card p-3 md:p-4"><div id="lQr" class="grid place-items-center" style="width:min(32vh,68vw);height:min(32vh,68vw)"></div></div>
+          <div class="md:col-start-2 md:row-start-4 text-slate-500 text-sm md:text-lg text-center">Or go to <b class="text-slate-700">${esc(clean.replace(/^https?:\/\//, ''))}</b> and enter code
             <span class="num font-bold text-slate-900 tracking-[.25em] text-2xl md:text-4xl align-middle ml-2">${esc(code)}</span></div>
         </div>
-        <div class="shrink-0 px-6 md:px-10 pb-6 md:pb-8"><div id="lNames" class="flex flex-wrap justify-center gap-2 md:gap-3 max-h-[38vh] overflow-y-auto"></div></div>
+        <div class="shrink-0 mt-auto pt-4 px-6 md:px-10 pb-6 md:pb-8"><div id="lNames" class="flex flex-wrap justify-center gap-2 md:gap-3 max-h-[38vh] overflow-y-auto"></div></div>
       </div>`;
       const box = $('#lQr', el), size = 560;
       loadScript('https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js')
