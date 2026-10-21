@@ -371,11 +371,13 @@ function normalizeState(s) {
   if (!s || typeof s !== 'object') return null;
   s.queue = toArr(s.queue); s.placed = toArr(s.placed); s.decisions = toArr(s.decisions);
   s.spent = s.spent || 0; s.idx = s.idx || 0; s.extraRows = s.extraRows || 0;
+  if (s.pick) s.pick.items = toArr(s.pick.items);
   return s;
 }
 const builtItems = s => { const seen = new Map(); s.placed.filter(p => !p.base).forEach(p => { if (!seen.has(p.itemId)) seen.set(p.itemId, p); }); return [...seen.values()]; };
 function gridDims(s) {
-  const tiles = s.queue.reduce((a, q) => a + (q.tiles || 1), 0) + s.placed.filter(p => p.base).length;
+  const seenQ = new Set();   // an item brought back for a second vote must not count twice
+  const tiles = s.queue.reduce((a, q) => { if (seenQ.has(q.id)) return a; seenQ.add(q.id); return a + (q.tiles || 1); }, 0) + s.placed.filter(p => p.base).length;
   const maxSlot = s.placed.reduce((m, p) => Math.max(m, p.slot == null ? -1 : p.slot), -1);
   const rows = Math.max(5, Math.ceil(tiles / COLS), Math.ceil((maxSlot + 1) / COLS)) + (s.extraRows || 0);
   return { cols: COLS, rows };
@@ -399,7 +401,31 @@ function freeSlots(s) {
   }
   return arr.sort((a, b) => a[0] - b[0]).map(x => x[1]);
 }
-const advanceAfter = s => { s.pending = null; s.idx++; s.phase = s.idx >= s.queue.length ? 'finished' : 'idle'; };
+const liveDecisions = s => s.decisions.filter(d => !d.superseded);
+/** Items that were actually voted down (not merely unaffordable) and still fit in the leftover budget. */
+function retryEligible(s) {
+  const rem = remaining(s), out = [], seen = new Set();
+  s.decisions.forEach(d => {
+    if (d.passed || d.superseded || seen.has(d.itemId) || d.yes + d.no === 0 || d.cost > rem) return;
+    const it = s.queue.find(q => q.id === d.itemId); if (!it) return;
+    seen.add(d.itemId); out.push({ ...it });
+  });
+  return out;
+}
+/** Votes → ranking. Each table's pick list holds up to 3 item ids; ties keep the original queue order. */
+function rankPicks(items, pk) {
+  const cnt = {}; items.forEach(i => { cnt[i.id] = 0; });
+  Object.values(pk || {}).forEach(v => { [...new Set(toArr(v))].slice(0, 3).forEach(id => { if (Object.prototype.hasOwnProperty.call(cnt, id)) cnt[id]++; }); });
+  return items.map((item, n) => ({ item, n, count: cnt[item.id] })).sort((a, b) => b.count - a.count || a.n - b.n);
+}
+const advanceAfter = s => {
+  s.pending = null; s.idx++;
+  if (s.idx < s.queue.length) { s.phase = 'idle'; return; }
+  // Queue exhausted. Money left and rejected projects that would fit? Offer one second-chance round.
+  const el = s.retryDone ? [] : retryEligible(s);
+  if (remaining(s) > 0 && el.length) { s.phase = 'pick'; s.pickId = uid(); s.pick = { items: el }; }
+  else s.phase = 'finished';
+};
 
 /* ════════════════════════════════════════════════════════════════════════════
    VIEW INFRASTRUCTURE
@@ -748,7 +774,7 @@ async function showHost(code, initial, isNew) {
     if (isNew) {
       const ex = await timeout(transport.get('state'), 9000);
       if (ex && !confirm(`Room ${code} already exists. Replace it with this new session?`)) { showSetup(); return; }
-      await timeout(transport.set('tables', null), 9000); await timeout(transport.set('votes', null), 9000);
+      await timeout(transport.set('tables', null), 9000); await timeout(transport.set('votes', null), 9000); await timeout(transport.set('picks', null), 9000);
       await timeout(transport.set('state', state), 9000);
     } else {
       state = normalizeState(await timeout(transport.get('state'), 9000));
@@ -761,7 +787,7 @@ async function showHost(code, initial, isNew) {
   store.set('civic:lastHost', code);
 
   /* ---- local runtime ---- */
-  let tables = {}, votes = {}, connected = true;
+  let tables = {}, votes = {}, picks = {}, connected = true, endingPick = false;
   let durSec = state.durationSec || 30, ending = false, lastBeep = -1, lastSlow = 0, allVotedAt = 0;
   let moveSel = null, finishedDismissed = false;
   const animateIds = new Set();
@@ -822,7 +848,8 @@ async function showHost(code, initial, isNew) {
     </main>
   </div>
   <div id="hOverlay"></div>
-  <div id="hLobby"></div>`;
+  <div id="hLobby"></div>
+  <div id="hPick"></div>`;
 
   function commit(fn) {
     fn(state); state.rev = (state.rev || 0) + 1; try { beat(); } catch {}
@@ -939,18 +966,18 @@ async function showHost(code, initial, isNew) {
     $('#bBar').style.width = pct + '%';
     $('#bBar').className = 'h-full transition-all duration-700 ' + (pct < 15 ? 'bg-amber-500' : 'bg-emerald-500');
     $('#bRem').className = 'num text-[clamp(2rem,9vw,3.25rem)] xl:text-7xl whitespace-nowrap font-bold leading-tight ' + (rem <= 0 ? 'text-rose-600' : 'text-emerald-600');
-    const ok = state.decisions.filter(d => d.passed).length, no = state.decisions.length - ok;
+    const live = liveDecisions(state), ok = live.filter(d => d.passed).length, no = live.length - ok;
     $('#bStats').textContent = `${ok} funded · ${no} rejected`;
   }
   function renderItem() {
     const it = curItem(), rem = remaining(state), n = state.queue.length;
     if (state.phase === 'finished' || !it) {
-      setHTML($('#cItem'), `<div class="text-center py-6"><div class="text-6xl mb-2">🎉</div><div class="font-display text-3xl font-semibold">All items decided</div><div class="text-slate-500 mt-1">Your city is complete.</div></div>`);
+      setHTML($('#cItem'), `<div class="text-center py-6"><div class="text-6xl mb-2">🎉</div><div class="font-display text-3xl font-semibold">${state.phase === 'pick' ? 'Second chance' : 'All items decided'}</div><div class="text-slate-500 mt-1">${state.phase === 'pick' ? 'Tables are picking projects to bring back.' : 'Your city is complete.'}</div></div>`);
       return;
     }
     const c = catColor(it.category), over = it.cost > rem, pct = Math.round(it.cost / Math.max(rem, 1) * 100);
     const live = state.phase === 'voting';
-    const status = live ? '● Voting open' : state.phase === 'result' ? 'Decision made' : state.phase === 'placing' ? 'Placing on the grid' : 'Up for vote';
+    const status = live ? '● Voting open' : state.phase === 'result' ? 'Decision made' : state.phase === 'placing' ? 'Placing on the grid' : (state.retryDone ? 'Second chance' : 'Up for vote');
     const pre = state.phase === 'idle' || live;
     setHTML($('#cItem'), `
       <div class="flex items-center justify-between mb-3">
@@ -1000,6 +1027,8 @@ async function showHost(code, initial, isNew) {
           <button data-act="end" class="btn btn-ghost !py-2 text-sm">End vote now</button>
         </div>
         <div class="flex ${total > COMPACT_AT ? 'gap-px' : 'gap-1.5'} mt-2">${Array.from({ length: Math.max(total, 1) }, (_, i) => `<div class="h-2 flex-1 rounded-full ${i < voted ? 'bg-emerald-400' : 'bg-white/20'}"></div>`).join('')}</div>`;
+    } else if (state.phase === 'pick') {
+      top = `<div class="text-slate-200 font-semibold">Second-chance picks are open</div><div class="text-sm text-slate-300 mt-1">The top 3 picks come back for one more vote.</div>`;
     } else if (state.phase === 'lobby') {
       top = `<div class="text-slate-200 font-semibold">Waiting in the lobby</div><div class="text-sm text-slate-300 mt-1">${online} ${online === 1 ? 'table has' : 'tables have'} joined so far.</div>`;
     } else if (state.phase === 'result') {
@@ -1108,7 +1137,7 @@ async function showHost(code, initial, isNew) {
       </div></div>`;
   }
   function finishedOverlay() {
-    const ok = state.decisions.filter(d => d.passed), no = state.decisions.filter(d => !d.passed);
+    const ok = liveDecisions(state).filter(d => d.passed), no = liveDecisions(state).filter(d => !d.passed);
     return `<div class="fixed inset-0 z-[70] grid place-items-center p-4 md:p-8 bg-slate-950/80 backdrop-blur-md fade-in">
       <div class="pop w-[min(96vw,900px)] max-h-[92vh] overflow-auto rounded-[2rem] bg-white text-slate-900 shadow-2xl p-6 md:p-10">
         <div class="text-center"><div class="text-6xl">🎉</div><h2 class="wordmark text-2xl md:text-4xl text-slate-600 mt-3">${esc(state.title)}</h2>
@@ -1119,7 +1148,7 @@ async function showHost(code, initial, isNew) {
           <div class="rounded-2xl bg-slate-100 p-4 text-center"><div class="text-xs font-bold text-slate-600">Rejected</div><div class="num text-xl md:text-4xl font-bold text-slate-700 mt-1">${no.length}</div></div>
         </div>
         <div class="mt-6 grid sm:grid-cols-2 gap-x-6 gap-y-1.5 text-sm">
-          ${state.decisions.map(d => `<div class="flex justify-between gap-3 py-1 border-b border-slate-100"><span class="truncate">${d.passed ? '✅' : '❌'} ${esc(d.name)}</span><span class="num font-semibold text-slate-500">${d.yes}–${d.no}</span></div>`).join('')}
+          ${liveDecisions(state).map(d => `<div class="flex justify-between gap-3 py-1 border-b border-slate-100"><span class="truncate">${d.passed ? '✅' : '❌'} ${esc(d.name)}</span><span class="num font-semibold text-slate-500">${d.yes}–${d.no}</span></div>`).join('')}
         </div>
         <div class="flex gap-3 justify-center mt-8"><button data-act="closeSummary" class="btn btn-dark !px-6">View the city</button><button data-act="newSession" class="btn btn-light !px-6">New session</button></div>
       </div></div>`;
@@ -1194,13 +1223,70 @@ async function showHost(code, initial, isNew) {
         + (hidden > 0 ? `<div class="lobby-chip !bg-slate-100 ${sz}"><span>+${hidden} more</span></div>` : '')
       : `<div class="text-slate-500 font-semibold text-xl md:text-3xl py-3">Waiting for tables to join<span class="dot-a">.</span><span class="dot-b">.</span><span class="dot-c">.</span></div>`);
   }
+  /* ---- second chance: leftover budget → tables pick up to 3 rejected projects → top 3 get one more vote ---- */
+  let pickBuilt = false, pickBuiltId = null;
+  function renderPick() {
+    const el = $('#hPick'); if (!el) return;
+    if (state.phase !== 'pick' || !state.pick) { if (pickBuilt) { el.innerHTML = ''; pickBuilt = false; pickBuiltId = null; } return; }
+    const items = toArr(state.pick.items);
+    if (!pickBuilt || pickBuiltId !== state.pickId) {
+      pickBuilt = true; pickBuiltId = state.pickId;
+      el.innerHTML = `
+      <div class="fixed inset-0 z-[65] flex flex-col bg-grid fade-in overflow-y-auto">
+        <div class="shrink-0 px-6 md:px-10 pt-6 md:pt-8 flex items-start justify-between gap-4">
+          <div class="min-w-0">${logoImg(56)}
+            <div class="wordmark text-2xl md:text-4xl text-slate-600 mt-3">Second Chance</div>
+            <p class="text-slate-500 mt-2 text-sm md:text-xl max-w-3xl leading-snug"><b class="text-emerald-600 num">${fmt(remaining(state))}</b> is still unspent. On your phone, pick up to 3 projects to bring back. The top 3 across the room get one more vote.</p></div>
+          <div class="flex flex-col items-end gap-2 shrink-0">
+            <button data-act="closepicks" class="btn btn-green !text-xl md:!text-2xl !py-4 md:!py-5 !px-8 md:!px-10 !rounded-2xl">Lock picks &amp; revote ▶</button>
+            <button data-act="skippick" class="btn btn-ghost !py-2 text-sm">Skip second chance</button>
+          </div>
+        </div>
+        <div class="px-6 md:px-10 mt-5"><div class="inline-flex items-center gap-4 rounded-2xl bg-white border border-slate-200 px-5 py-3 shadow-sm">
+          <span class="text-sm md:text-base font-semibold text-slate-500">Tables that have picked</span><span id="pCount" class="num text-3xl md:text-4xl font-bold text-emerald-600 leading-none">0</span></div></div>
+        <div id="pList" class="px-6 md:px-10 py-5 pb-8 grid gap-3 md:gap-4 sm:grid-cols-2 xl:grid-cols-3 content-start"></div>
+      </div>`;
+    }
+    const pk = picks?.[state.pickId] || {}, ranked = rankPicks(items, pk), max = Math.max(1, ...ranked.map(r => r.count));
+    const online = tableList().filter(t => t.online).length, voters = Object.keys(pk).length;
+    $('#pCount').textContent = `${voters} of ${Math.max(online, voters)}`;
+    setHTML($('#pList'), ranked.map((r, i) => {
+      const q = r.item, c = catColor(q.category), top = i < 3 && r.count > 0, d = state.decisions.find(x => x.itemId === q.id);
+      return `<div class="card p-4 flex items-center gap-4 ${top ? '!border-emerald-500 ring-2 ring-emerald-300' : ''}">
+        <div class="w-16 h-16 md:w-20 md:h-20 text-4xl md:text-5xl shrink-0 rounded-2xl grid place-items-center" style="background:${c}1f;border:2px solid ${c}66">${iconHTML(q.icon)}</div>
+        <div class="min-w-0 flex-1">
+          <div class="font-bold text-slate-900 truncate md:text-xl">${top ? `<span class="chip bg-emerald-100 text-emerald-800 border-emerald-300 mr-1.5">#${i + 1}</span>` : ''}${esc(q.name)}</div>
+          <div class="text-sm text-slate-500">${fmt(q.cost)}${d ? ` · first vote ${d.yes}–${d.no}` : ''}</div>
+          <div class="h-2.5 rounded-full bg-slate-100 overflow-hidden mt-2"><div class="h-full rounded-full bg-emerald-500 transition-all duration-500" style="width:${r.count / max * 100}%"></div></div></div>
+        <div class="num text-4xl md:text-5xl font-bold ${r.count ? 'text-emerald-600' : 'text-slate-300'}">${r.count}</div></div>`;
+    }).join(''));
+  }
+  async function endPick() {
+    if (state.phase !== 'pick' || endingPick) return;
+    endingPick = true;
+    let pk = picks?.[state.pickId] || {};
+    try { const fresh = await timeout(transport.get('picks/' + state.pickId), 2000); if (fresh) pk = fresh; } catch {}
+    const top = rankPicks(toArr(state.pick?.items), pk).filter(r => r.count > 0).slice(0, 3);
+    commit(s => {
+      s.retryDone = true; s.pick = null;
+      if (!top.length) { s.phase = 'finished'; return; }
+      const ids = new Set(top.map(r => r.item.id));
+      s.decisions.forEach(d => { if (ids.has(d.itemId) && !d.passed) d.superseded = true; });
+      const start = s.queue.length;
+      top.forEach(r => s.queue.push({ ...r.item }));
+      s.idx = start; s.phase = 'idle';
+    });
+    endingPick = false;
+    toast(top.length ? `Second chance: ${top.map(r => r.item.name).join(', ')}` : 'No picks were made. Wrapping up.');
+  }
+
   function beginGame() {
     if (state.phase !== 'lobby') return;
     beep(520, .1); setTimeout(() => beep(780, .14), 110);
     commit(s => { s.phase = 'idle'; });
   }
 
-  function renderAll() { startMusic(); renderBudget(); renderItem(); renderVote(); renderNext(); renderCity(); renderBar(); renderOverlay(); renderLobby(); renderConn(); }
+  function renderAll() { startMusic(); renderBudget(); renderItem(); renderVote(); renderNext(); renderCity(); renderBar(); renderOverlay(); renderLobby(); renderPick(); renderConn(); }
 
   /* ---- timer / loop ---- */
   function tick(renderOnly) {
@@ -1217,16 +1303,17 @@ async function showHost(code, initial, isNew) {
         if (voted > 0 && voted >= online) { if (!allVotedAt) allVotedAt = now; else if (now - allVotedAt > 1200) endVote(); } else allVotedAt = 0;
       }
     }
-    if (!renderOnly && performance.now() - lastSlow > 1500) { lastSlow = performance.now(); renderVote(); renderLobby(); renderConn(); }
+    if (!renderOnly && performance.now() - lastSlow > 1500) { lastSlow = performance.now(); renderVote(); renderLobby(); renderPick(); renderConn(); }
   }
 
   /* ---- listeners ---- */
   // 50 tables heartbeat every 5 s and vote in a burst; coalesce the redraws instead of rebuilding the panel per message
   let rvTimer = null;
-  const queueVoteRender = () => { if (rvTimer) return; rvTimer = setTimeout(() => { rvTimer = null; renderVote(); renderLobby(); renderConn(); }, 120); };
+  const queueVoteRender = () => { if (rvTimer) return; rvTimer = setTimeout(() => { rvTimer = null; renderVote(); renderLobby(); renderPick(); renderConn(); }, 120); };
   teardown.push(() => clearTimeout(rvTimer));
   teardown.push(transport.on('tables', v => { tables = v || {}; queueVoteRender(); }));
   teardown.push(transport.on('votes', v => { votes = v || {}; queueVoteRender(); }));
+  teardown.push(transport.on('picks', v => { picks = v || {}; queueVoteRender(); }));
   teardown.push(keepAwake());
   transport.onConnection(c => { connected = c; renderConn(); });
   const beat = () => Promise.resolve(transport.set('hostSeen', transport.now())).catch(() => {});
@@ -1241,6 +1328,8 @@ async function showHost(code, initial, isNew) {
     b.blur && b.blur();
     switch (b.dataset.act) {
       case 'begin': beginGame(); break;
+      case 'closepicks': endPick(); break;
+      case 'skippick': if (state.phase === 'pick' && confirm('Skip the second chance and finish the session?')) commit(s => { s.retryDone = true; s.pick = null; s.phase = 'finished'; }); break;
       case 'start': startVote(); break;
       case 'end': endVote(); break;
       case 'continue': afterResult(); break;
@@ -1283,7 +1372,7 @@ async function showHost(code, initial, isNew) {
       </div></div>`);
     $('#mRename', m).onclick = () => { m.close(); const nn = prompt('Name your city', state.title); if (nn && nn.trim()) commit(s => { s.title = nn.trim().slice(0, 32); }); };
     $('#mSkip', m).onclick = () => { m.close(); skipItem(); };
-    $('#mFinish', m).onclick = () => { m.close(); if (state.phase === 'idle') finishSession(); else toast('Wait for the current vote and placement to finish first'); };
+    $('#mFinish', m).onclick = () => { m.close(); if (state.phase === 'idle' || state.phase === 'pick') finishSession(); else toast('Wait for the current vote and placement to finish first'); };
     $('#mNew', m).onclick = () => { m.close(); if (confirm('Close this room and start a new setup?')) { transport.set('state', null); store.del('civic:lastHost'); showSetup(); } };
     $('#mExit', m).onclick = () => { m.close(); showLanding(); };
   }
@@ -1327,11 +1416,13 @@ async function showTable(code, name) {
   const tid = claimed.tid;
   if (name !== requestedName) toast(`“${requestedName}” was already taken, so you’re joined as “${name}”.`);
   const lockKey = vid => `civic:vote:${code}:${vid}:${tid}`;
+  let pickKey = null, unsubPick = null, remotePick = null, pickSel = new Set(), pickEdit = false;
   let hostSeen = 0, hostSeenLoaded = false, graceUntil = Date.now() + 10000, connected = true, remoteVote = null, voteKey = null, unsubMine = null, acked = null, wasOver = false, lastHostOn = null;
 
   const reg = () => Promise.resolve(transport.set('tables/' + tid, { name, dev, lastSeen: transport.now() })).catch(() => {});
   reg(); const hb = setInterval(reg, HEARTBEAT_MS); teardown.push(() => clearInterval(hb));
   teardown.push(() => unsubMine && unsubMine());
+  teardown.push(() => unsubPick && unsubPick());
   const onVisible = () => { if (document.visibilityState === 'visible') reg(); };   // phone just woke up → show as online right away
   document.addEventListener('visibilitychange', onVisible); teardown.push(() => document.removeEventListener('visibilitychange', onVisible));
   teardown.push(keepAwake());
@@ -1341,6 +1432,12 @@ async function showTable(code, name) {
   // and several missed beats before declaring the host gone.
   const hostOnline = () => !hostSeenLoaded || Date.now() < graceUntil || transport.now() - hostSeen < HOST_STALE_MS;
 
+  function syncPick() {
+    const pid = state && state.phase === 'pick' ? state.pickId : null;
+    if (pid === pickKey) return;
+    unsubPick && unsubPick(); unsubPick = null; pickKey = pid; remotePick = null; pickSel = new Set(); pickEdit = false;
+    if (pid) unsubPick = transport.on(`picks/${pid}/${tid}`, v => { remotePick = v ? toArr(v) : null; if (remotePick && !pickEdit) pickSel = new Set(remotePick); render(); });
+  }
   function syncMine() {
     if (!state || state.voteId === voteKey) return;
     unsubMine && unsubMine(); voteKey = state.voteId; remoteVote = null; acked = null;
@@ -1450,6 +1547,23 @@ async function showTable(code, name) {
         <p class="text-slate-500 mt-1">${builtItems(s).length} ${builtItems(s).length === 1 ? 'project was' : 'projects were'} funded, and ${fmt(remaining(s))} is left.</p></div>${budgetCard()}`;
     }
 
+    if (s.phase === 'pick' && s.pick) {
+      const items = toArr(s.pick.items), done = !!remotePick && !pickEdit, n = pickSel.size;
+      const list = items.map(q => { const on = pickSel.has(q.id), c = catColor(q.category);
+        return `<button data-act="pickitem" data-id="${esc(q.id)}" ${done ? 'disabled' : ''} class="w-full text-left rounded-2xl border-2 p-3 flex items-center gap-3 transition ${on ? 'border-emerald-500 bg-emerald-50' : 'border-slate-200 bg-white'} ${done && !on ? 'opacity-50' : ''}">
+          <span class="w-12 h-12 text-3xl shrink-0 rounded-xl grid place-items-center" style="background:${c}1f;border:2px solid ${c}66">${iconHTML(q.icon)}</span>
+          <span class="min-w-0 flex-1"><span class="block font-bold text-slate-900 truncate">${esc(q.name)}</span><span class="block text-xs text-slate-500">${esc(q.category)} · ${fmt(q.cost)}</span></span>
+          <span class="w-7 h-7 shrink-0 rounded-full grid place-items-center text-sm font-bold ${on ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-transparent'}">✓</span></button>`; }).join('');
+      const action = done
+        ? `<div class="card p-4 text-center pop"><div class="font-display text-xl font-semibold text-emerald-700">✓ Picks locked in</div><div class="text-sm text-slate-500 mt-1">Waiting for the host to start the revote.</div><button data-act="editpicks" class="btn btn-light !py-2 mt-3 text-sm">Change my picks</button></div>`
+        : `<button data-act="submitpicks" class="btn btn-green w-full !text-lg !py-4 !rounded-2xl" ${n ? '' : 'disabled'}>${n ? `Submit ${n} ${n === 1 ? 'pick' : 'picks'} (${n} of 3)` : 'Pick up to 3 projects'}</button>`;
+      return `${budgetCard(true)}
+        <div class="card p-4 sm:p-5 pop"><div class="text-4xl mb-1">🔁</div><h2 class="font-display text-xl sm:text-2xl font-semibold">Second chance</h2>
+          <p class="text-slate-500 text-sm mt-1 leading-relaxed">There’s still money left. Pick up to 3 projects you’d like to bring back for one more vote. The top 3 across the room return.</p></div>
+        <div class="space-y-2">${list}</div>
+        <div class="sticky bottom-0 -mx-3 sm:-mx-4 px-3 sm:px-4 pt-3 pb-[max(.75rem,env(safe-area-inset-bottom))] bg-gradient-to-t from-[#f6f7f4] via-[#f6f7f4]/95 to-transparent">${action}</div>`;
+    }
+
     if (s.phase === 'lobby') {
       return `<div class="card p-8 text-center pop mt-2"><div class="text-6xl mb-3">👋</div><h2 class="font-display text-3xl font-semibold">You’re in!</h2>
         <p class="text-slate-500 mt-2">Joined as <b class="text-slate-700">${esc(name)}</b></p>
@@ -1459,14 +1573,14 @@ async function showTable(code, name) {
     const last = s.result && s.decisions.length
       ? `<div class="panel p-4 flex items-center gap-3"><span class="text-2xl">${s.result.passed ? '✅' : '❌'}</span><div class="min-w-0"><div class="text-xs font-semibold text-slate-300">Last decision</div><div class="font-semibold text-white truncate">${esc(s.result.name)} ${s.result.passed ? 'passed' : 'did not pass'} (${s.result.yes}–${s.result.no})</div></div></div>` : '';
     return `${budgetCard()}
-      <div class="card p-6 text-center pop"><div class="text-5xl mb-2">⏳</div><h2 class="font-display text-2xl font-semibold">Waiting for the next vote</h2>
+      <div class="card p-6 text-center pop"><div class="text-5xl mb-2">⏳</div><h2 class="font-display text-2xl font-semibold">${s.retryDone ? 'Second-chance vote coming up' : 'Waiting for the next vote'}</h2>
         <p class="text-slate-500 mt-1">Keep this screen open. It updates the moment the host starts.</p>
         ${it ? `<div class="mt-4 rounded-2xl bg-slate-100 p-3 flex items-center gap-3 text-left"><span class="text-3xl">${iconHTML(it.icon)}</span><div class="min-w-0"><div class="text-xs font-semibold text-slate-500">Up next</div><div class="font-bold truncate">${esc(it.name)}</div></div><div class="num font-bold ml-auto">${fmtShort(it.cost)}</div></div>` : ''}</div>${last}`;
   }
 
   function render() {
     if (!state) { setHTML(root, `<div class="min-h-[100dvh] grid place-items-center p-6 text-center"><div><div class="text-5xl mb-3">👋</div><div class="text-slate-700 font-display text-2xl font-semibold">The host closed this session</div><button data-act="leave" class="btn btn-green mt-5">Back to home</button></div></div>`); return; }
-    setHTML(root, `<div class="min-h-[100dvh] flex flex-col max-w-xl md:max-w-2xl mx-auto w-full">${header()}<main class="flex-1 flex flex-col gap-3 sm:gap-4 px-3 sm:px-4 pb-[max(1rem,env(safe-area-inset-bottom))]">${body()}${state.phase === 'lobby' ? '' : (state.phase === 'voting' ? '' : cityStrip()) + queueStrip()}</main></div>`);
+    setHTML(root, `<div class="min-h-[100dvh] flex flex-col max-w-xl md:max-w-2xl mx-auto w-full">${header()}<main class="flex-1 flex flex-col gap-3 sm:gap-4 px-3 sm:px-4 pb-[max(1rem,env(safe-area-inset-bottom))]">${body()}${state.phase === 'lobby' || state.phase === 'pick' ? '' : (state.phase === 'voting' ? '' : cityStrip()) + queueStrip()}</main></div>`);
     tick();
   }
   function tick() {
@@ -1479,6 +1593,20 @@ async function showTable(code, name) {
     } else wasOver = false;
     const on = hostOnline(); if (on !== lastHostOn) { lastHostOn = on; render(); }
   }
+  function togglePick(id) {
+    if (!state || state.phase !== 'pick' || (remotePick && !pickEdit)) return;
+    if (pickSel.has(id)) pickSel.delete(id);
+    else if (pickSel.size >= 3) { toast('You can pick up to 3 projects'); return; }
+    else pickSel.add(id);
+    render();
+  }
+  async function submitPicks() {
+    if (!state || state.phase !== 'pick' || !pickKey || !pickSel.size) return;
+    const ids = [...pickSel], key = pickKey;
+    try { await transport.set(`picks/${key}/${tid}`, ids); if (key === pickKey) { remotePick = ids; pickEdit = false; } if (navigator.vibrate) navigator.vibrate(40); }
+    catch { toast('Your picks didn’t send. Tap again to retry.', 'error'); }
+    render();
+  }
   async function cast(choice) {
     if (!state || state.phase !== 'voting' || myVote() || transport.now() >= state.endsAt + VOTE_LATE_MS) return;
     const vid = state.voteId;
@@ -1490,7 +1618,7 @@ async function showTable(code, name) {
     render();
   }
 
-  teardown.push(transport.on('state', v => { state = normalizeState(v); syncMine(); render(); }));
+  teardown.push(transport.on('state', v => { state = normalizeState(v); syncMine(); syncPick(); render(); }));
   teardown.push(transport.on('hostSeen', v => { hostSeen = v || 0; hostSeenLoaded = true; const on = hostOnline(); if (on !== lastHostOn) { lastHostOn = on; render(); } }));
   transport.onConnection(c => { connected = c; if (c) { graceUntil = Date.now() + 10000; reg(); } render(); });
   const loop = setInterval(tick, 250); teardown.push(() => clearInterval(loop));
@@ -1499,11 +1627,14 @@ async function showTable(code, name) {
     const b = e.target.closest('[data-act]'); if (!b) return;
     if (b.dataset.act === 'yes') cast('yes');
     else if (b.dataset.act === 'no') cast('no');
+    else if (b.dataset.act === 'pickitem') togglePick(b.dataset.id);
+    else if (b.dataset.act === 'submitpicks') submitPicks();
+    else if (b.dataset.act === 'editpicks') { pickEdit = true; render(); }
     else if (b.dataset.act === 'leave') { if (!state || confirm('Leave this room?')) showLanding(); }
   };
   app.addEventListener('click', onClick); teardown.push(() => app.removeEventListener('click', onClick));
 
-  syncMine(); render();
+  syncMine(); syncPick(); render();
 }
 
 /* ════════════════════════════════════════════════════════════════════════════
