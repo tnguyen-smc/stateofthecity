@@ -58,7 +58,7 @@
   .card { background: #fff; color: #38393b; border-radius: 1.25rem; border: 1px solid #e6e7e2; box-shadow: 0 14px 34px -22px rgba(56,57,59,.45); }
   .panel { background: #4a4b4d; color: #fff; border-radius: 1.25rem; box-shadow: 0 14px 34px -18px rgba(56,57,59,.65); }
   .chip { display:inline-flex; align-items:center; gap:.35rem; padding:.15rem .6rem; border-radius:999px; font-size:.72rem; font-weight:700; border:1px solid transparent; }
-  .field { width:100%; border:1.5px solid #d4d5d0; border-radius:.75rem; padding:.6rem .8rem; font-size:.95rem; background:#fff; color:#2a2b2c; outline:none; }
+  .field { width:100%; border:1.5px solid #d4d5d0; border-radius:.75rem; padding:.6rem .8rem; font-size:16px; background:#fff; color:#2a2b2c; outline:none; }
   .field:focus { border-color:#8dc63f; box-shadow:0 0 0 3px rgba(141,198,63,.28); }
   .lbl { display:block; font-size:.78rem; font-weight:600; color:#58595b; margin-bottom:.3rem; }
   .btn { display:inline-flex; align-items:center; justify-content:center; gap:.5rem; font-weight:700; border-radius:.85rem; padding:.65rem 1.1rem; transition: transform .08s, filter .15s, background .15s; cursor:pointer; }
@@ -115,7 +115,7 @@
   .dot-a { animation: dots 1.4s infinite; } .dot-b { animation: dots 1.4s .2s infinite; } .dot-c { animation: dots 1.4s .4s infinite; }
   @keyframes checkPop { 0%{transform:scale(0) rotate(-30deg)} 70%{transform:scale(1.15) rotate(6deg)} 100%{transform:scale(1) rotate(0)} }
   .check-pop { animation: checkPop .5s cubic-bezier(.2,1.3,.3,1) both; }
-  .vote-btn { border-radius: 1.75rem; font-weight: 800; color:#fff; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:.25rem;
+  .vote-btn { border-radius: 1.5rem; font-weight: 800; color:#fff; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:.25rem;
     border-bottom: 10px solid rgba(0,0,0,.25); transition: transform .08s, border-width .08s, filter .15s; touch-action: manipulation; user-select:none; }
   .vote-btn:active:not(:disabled) { transform: translateY(6px); border-bottom-width: 4px; }
   @media (prefers-reduced-motion: reduce) {
@@ -139,7 +139,9 @@ const LOGO_SRC = 'citylogo.png';
 const COLS = 6;
 const HEARTBEAT_MS = 5000;
 const STALE_MS = 16000;
-const LATE_VOTE_GRACE_MS = 1500;   // after the timer hits 0, wait this long for votes still in flight on slow Wi-Fi
+const HOST_STALE_MS = 45000;       // participants call the host offline only after this long without a heartbeat (several missed beats)
+const VOTE_LATE_MS = 2500;         // a table can still tap YES/NO this long after the timer hits 0 and the vote still counts
+const LATE_VOTE_GRACE_MS = 3500;   // host waits this long after 0 before tallying (late window + time for the vote to arrive)
 const COMPACT_AT = 24;             // host panel switches to compact mode above this many tables
 const MAX_CHIPS = 40;              // never draw more than this many table chips on the host panel
 const KEY_DRAFT = 'civic:draft2';
@@ -470,12 +472,12 @@ function showHostLanding(notice) {
 function showJoinPage(notice) {
   cleanup();
   app.innerHTML = `
-  <div class="min-h-screen bg-grid flex flex-col">
-    <main class="flex-1 grid place-items-center px-4 py-8">
+  <div class="min-h-[100dvh] bg-grid flex flex-col">
+    <main class="flex-1 grid place-items-center px-4 py-6 sm:py-8">
       <div class="w-full max-w-md">
-        <div class="flex justify-center">${logoImg(110)}</div>
+        <div class="flex justify-center">${logoImg(84)}</div>
         ${notice ? `<div class="mt-6 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-sm px-4 py-3 pop">${esc(notice)}</div>` : ''}
-        <section class="card p-7 mt-7">
+        <section class="card p-5 sm:p-7 mt-5 sm:mt-7">
           <h1 class="font-display text-2xl md:text-3xl font-semibold leading-tight">Join the Room</h1>
           <p class="text-slate-500 mt-2 leading-relaxed">Enter the room code from the main screen and name your table. Each table gets only one vote per item.</p>
           <div class="mt-6 space-y-4">
@@ -823,7 +825,7 @@ async function showHost(code, initial, isNew) {
   <div id="hLobby"></div>`;
 
   function commit(fn) {
-    fn(state); state.rev = (state.rev || 0) + 1;
+    fn(state); state.rev = (state.rev || 0) + 1; try { beat(); } catch {}
     Promise.resolve(transport.set('state', state)).catch(err => toast('Sync error: ' + err.message, 'error'));
     renderAll();
   }
@@ -1175,11 +1177,11 @@ async function showHost(code, initial, isNew) {
         </div>
         <div class="flex-1 min-h-0 flex flex-col items-center justify-center px-6 py-4">
           <div class="font-display text-3xl md:text-5xl font-semibold text-slate-700">Scan to Join</div>
-          <div class="card p-4 md:p-6 mt-4 md:mt-5"><div id="lQr" class="grid place-items-center" style="width:min(46vh,82vw);height:min(46vh,82vw)"></div></div>
+          <div class="card p-3 md:p-4 mt-3 md:mt-4"><div id="lQr" class="grid place-items-center" style="width:min(32vh,68vw);height:min(32vh,68vw)"></div></div>
           <div class="mt-4 text-slate-500 text-sm md:text-lg text-center">Or go to <b class="text-slate-700">${esc(clean.replace(/^https?:\/\//, ''))}</b> and enter code
             <span class="num font-bold text-slate-900 tracking-[.25em] text-2xl md:text-4xl align-middle ml-2">${esc(code)}</span></div>
         </div>
-        <div class="shrink-0 px-6 md:px-10 pb-6 md:pb-8"><div id="lNames" class="flex flex-wrap justify-center gap-2 max-h-[22vh] overflow-y-auto"></div></div>
+        <div class="shrink-0 px-6 md:px-10 pb-6 md:pb-8"><div id="lNames" class="flex flex-wrap justify-center gap-2 md:gap-3 max-h-[38vh] overflow-y-auto"></div></div>
       </div>`;
       const box = $('#lQr', el), size = 560;
       loadScript('https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js')
@@ -1187,13 +1189,13 @@ async function showHost(code, initial, isNew) {
         .catch(() => { box.innerHTML = '<div class="text-sm text-slate-400 text-center">QR code unavailable.<br>Use the link below.</div>'; });
     }
     const list = tableList().filter(t => t.online), CAP = 60, shown = list.slice(0, CAP), hidden = list.length - shown.length;
-    const big = list.length > 24;
+    const n = list.length, sz = n <= 12 ? 'text-2xl md:text-4xl !py-3 !px-6' : n <= 30 ? 'text-xl md:text-3xl !py-2 !px-5' : 'text-base md:text-xl !py-1.5 !px-3.5';
     $('#lCount').textContent = list.length;
     setHTML($('#lNames'), list.length
       ? shown.map(t => { const isNew = !lobbySeen.has(t.id); lobbySeen.add(t.id);
-          return `<div class="lobby-chip ${isNew ? 'pop' : ''} ${big ? '!text-sm !py-1 !px-3' : 'text-base md:text-xl'}"><i></i><span>${esc(t.name)}</span></div>`; }).join('')
-        + (hidden > 0 ? `<div class="lobby-chip !bg-slate-100 ${big ? '!text-sm' : ''}"><span>+${hidden} more</span></div>` : '')
-      : `<div class="text-slate-500 font-semibold text-base md:text-xl py-3">Waiting for tables to join<span class="dot-a">.</span><span class="dot-b">.</span><span class="dot-c">.</span></div>`);
+          return `<div class="lobby-chip ${isNew ? 'pop' : ''} ${sz}"><i></i><span>${esc(t.name)}</span></div>`; }).join('')
+        + (hidden > 0 ? `<div class="lobby-chip !bg-slate-100 ${sz}"><span>+${hidden} more</span></div>` : '')
+      : `<div class="text-slate-500 font-semibold text-xl md:text-3xl py-3">Waiting for tables to join<span class="dot-a">.</span><span class="dot-b">.</span><span class="dot-c">.</span></div>`);
   }
   function beginGame() {
     if (state.phase !== 'lobby') return;
@@ -1328,7 +1330,7 @@ async function showTable(code, name) {
   const tid = claimed.tid;
   if (name !== requestedName) toast(`“${requestedName}” was already taken, so you’re joined as “${name}”.`);
   const lockKey = vid => `civic:vote:${code}:${vid}:${tid}`;
-  let hostSeen = 0, connected = true, remoteVote = null, voteKey = null, unsubMine = null, acked = null, wasOver = false, lastHostOn = null;
+  let hostSeen = 0, hostSeenLoaded = false, graceUntil = Date.now() + 10000, connected = true, remoteVote = null, voteKey = null, unsubMine = null, acked = null, wasOver = false, lastHostOn = null;
 
   const reg = () => Promise.resolve(transport.set('tables/' + tid, { name, dev, lastSeen: transport.now() })).catch(() => {});
   reg(); const hb = setInterval(reg, HEARTBEAT_MS); teardown.push(() => clearInterval(hb));
@@ -1338,7 +1340,9 @@ async function showTable(code, name) {
   teardown.push(keepAwake());
 
   const myVote = () => (state && state.voteId && store.get(lockKey(state.voteId), null)) || remoteVote;
-  const hostOnline = () => transport.now() - hostSeen < STALE_MS;
+  // Lenient on purpose: no verdict until the first heartbeat has loaded, a grace period after (re)connecting while cached values refresh,
+  // and several missed beats before declaring the host gone.
+  const hostOnline = () => !hostSeenLoaded || Date.now() < graceUntil || transport.now() - hostSeen < HOST_STALE_MS;
 
   function syncMine() {
     if (!state || state.voteId === voteKey) return;
@@ -1346,16 +1350,16 @@ async function showTable(code, name) {
     if (voteKey) unsubMine = transport.on(`votes/${voteKey}/${tid}`, v => { remoteVote = v || null; if (v) acked = voteKey; render(); });
   }
 
-  app.innerHTML = `<div id="tRoot" class="min-h-screen bg-grid"></div>`;
+  app.innerHTML = `<div id="tRoot" class="min-h-[100dvh] bg-grid"></div>`;
   const root = $('#tRoot');
 
   function header() {
     const on = connected && hostOnline();
-    return `<header class="flex items-center justify-between gap-3 px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-3">
-      <div class="flex items-center gap-2 min-w-0"><span class="chip bg-emerald-400 text-emerald-950 !text-sm !px-3 !py-1 truncate max-w-[12rem]">${esc(name)}</span><span class="num text-slate-700 font-bold tracking-widest">${esc(code)}</span></div>
-      <div class="flex items-center gap-3"><span class="inline-flex items-center gap-1.5 text-xs font-semibold ${on ? 'text-emerald-700' : 'text-amber-600'}"><span class="w-2 h-2 rounded-full ${on ? 'bg-emerald-400' : 'bg-amber-400 animate-pulse'}"></span>${!connected ? 'Reconnecting…' : hostOnline() ? 'Connected' : 'Host offline'}</span>
+    return `<header class="flex items-center justify-between gap-3 px-3 sm:px-4 pt-[max(.75rem,env(safe-area-inset-top))] pb-2 sm:pb-3">
+      <div class="flex items-center gap-2 min-w-0"><span class="chip bg-emerald-400 text-emerald-950 !text-sm !px-3 !py-1 truncate max-w-[8.5rem] sm:max-w-[12rem]">${esc(name)}</span><span class="num text-slate-700 font-bold tracking-widest">${esc(code)}</span></div>
+      <div class="flex items-center gap-3 shrink-0"><span class="inline-flex items-center gap-1.5 text-xs font-semibold ${on ? 'text-emerald-700' : 'text-amber-600'}"><span class="w-2 h-2 rounded-full ${on ? 'bg-emerald-400' : 'bg-amber-400 animate-pulse'}"></span>${!connected ? 'Reconnecting…' : on ? 'Connected' : 'Host offline'}</span>
       <button data-act="leave" class="text-xs text-slate-500 underline">Leave</button></div></header>
-      <div class="px-4 pb-3 text-center flex flex-col items-center">${logoImg(52)}<div class="wordmark text-lg text-slate-600 truncate max-w-full mt-2">${esc(state.title)}</div></div>`;
+      <div class="px-4 pb-2 sm:pb-3 flex items-center justify-center gap-3 min-w-0">${logoImg(36)}<div class="wordmark text-sm sm:text-lg text-slate-600 truncate min-w-0">${esc(state.title)}</div></div>`;
   }
   function budgetCard(compact) {
     const rem = remaining(state), pct = Math.max(0, Math.min(100, rem / state.startingBudget * 100));
@@ -1370,8 +1374,8 @@ async function showTable(code, name) {
   }
   function itemHeader(it) {
     const c = catColor(it.category);
-    return `<div class="flex items-center gap-4"><div class="w-16 h-16 text-4xl shrink-0 rounded-2xl grid place-items-center" style="background:${c}1f;border:2px solid ${c}66">${iconHTML(it.icon)}</div>
-      <div class="min-w-0"><span class="chip" style="background:${c}26;border-color:${c}">${esc(it.category)}</span><h2 class="font-display text-2xl md:text-3xl font-semibold leading-tight mt-1">${esc(it.name)}</h2></div></div>`;
+    return `<div class="flex items-center gap-4"><div class="w-14 h-14 sm:w-16 sm:h-16 text-3xl sm:text-4xl shrink-0 rounded-2xl grid place-items-center" style="background:${c}1f;border:2px solid ${c}66">${iconHTML(it.icon)}</div>
+      <div class="min-w-0"><span class="chip" style="background:${c}26;border-color:${c}">${esc(it.category)}</span><h2 class="font-display text-xl sm:text-2xl md:text-3xl font-semibold leading-tight mt-1">${esc(it.name)}</h2></div></div>`;
   }
   function cityStrip() {
     const p = builtItems(state);
@@ -1395,7 +1399,7 @@ async function showTable(code, name) {
 
     if (s.phase === 'voting' && it) {
       const rem = remaining(s), after = rem - it.cost, pct = Math.min(999, Math.round(it.cost / Math.max(rem, 1) * 100));
-      const over = transport.now() >= s.endsAt;
+      const over = transport.now() >= s.endsAt + VOTE_LATE_MS;
       let action;
       if (mine) {
         action = `<div class="card p-6 text-center pop flex-1 grid place-items-center">
@@ -1407,16 +1411,16 @@ async function showTable(code, name) {
       } else if (over) {
         action = `<div class="card p-6 text-center flex-1 grid place-items-center"><div><div class="text-5xl mb-2">⏱️</div><h3 class="font-display text-2xl font-semibold">Time’s up</h3><p class="text-slate-500 mt-1">Counting the votes…</p></div></div>`;
       } else {
-        action = `<div class="grid grid-cols-2 gap-4 flex-1 min-h-[42vh]">
-          <button data-act="yes" class="vote-btn bg-emerald-500 text-4xl md:text-6xl"><span class="text-6xl md:text-8xl leading-none">👍</span>YES<span class="text-sm md:text-lg font-semibold opacity-90">Fund it</span></button>
-          <button data-act="no" class="vote-btn bg-rose-500 text-4xl md:text-6xl"><span class="text-6xl md:text-8xl leading-none">👎</span>NO<span class="text-sm md:text-lg font-semibold opacity-90">Pass on it</span></button></div>`;
+        action = `<div class="grid grid-cols-2 gap-3 sm:gap-4 flex-1 min-h-[220px]">
+          <button data-act="yes" class="vote-btn bg-emerald-500 text-3xl sm:text-4xl md:text-6xl"><span class="text-5xl sm:text-6xl md:text-8xl leading-none">👍</span>YES<span class="text-sm md:text-lg font-semibold opacity-90">Fund it</span></button>
+          <button data-act="no" class="vote-btn bg-rose-500 text-3xl sm:text-4xl md:text-6xl"><span class="text-5xl sm:text-6xl md:text-8xl leading-none">👎</span>NO<span class="text-sm md:text-lg font-semibold opacity-90">Pass on it</span></button></div>`;
       }
-      return `${budgetCard(true)}<div class="card p-5 pop">${itemHeader(it)}
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
-            <div class="rounded-2xl bg-slate-100 p-3"><div class="text-xs font-semibold text-slate-500">Cost</div><div class="num fit-num font-bold">${fmt(it.cost)}</div><div class="text-xs text-slate-500">${pct}% of what’s left</div></div>
-            <div class="rounded-2xl ${after < 0 ? 'bg-amber-50' : 'bg-emerald-50'} p-3"><div class="text-xs font-semibold text-slate-500">Left if approved</div><div class="num fit-num font-bold ${after < 0 ? 'text-amber-600' : 'text-emerald-600'}">${after < 0 ? 'Over budget' : fmt(after)}</div></div>
+      return `${budgetCard(true)}<div class="card p-4 sm:p-5 pop">${itemHeader(it)}
+          <div class="grid grid-cols-2 gap-2 sm:gap-3 mt-3 sm:mt-4">
+            <div class="rounded-2xl bg-slate-100 p-2.5 sm:p-3"><div class="text-xs font-semibold text-slate-500">Cost</div><div class="num fit-num font-bold">${fmt(it.cost)}</div><div class="text-xs text-slate-500">${pct}% of what’s left</div></div>
+            <div class="rounded-2xl ${after < 0 ? 'bg-amber-50' : 'bg-emerald-50'} p-2.5 sm:p-3"><div class="text-xs font-semibold text-slate-500">Left if approved</div><div class="num fit-num font-bold ${after < 0 ? 'text-amber-600' : 'text-emerald-600'}">${after < 0 ? 'Over budget' : fmt(after)}</div></div>
           </div>
-          <div class="flex items-center gap-3 mt-4"><div class="num text-2xl font-bold w-12" id="tTime">--</div><div class="flex-1 h-3 rounded-full bg-slate-200 overflow-hidden"><div id="tBar" class="h-full rounded-full bg-emerald-500" style="width:100%"></div></div></div></div>
+          <div class="flex items-center gap-3 mt-3 sm:mt-4"><div class="num text-2xl font-bold w-12" id="tTime">--</div><div class="flex-1 h-3 rounded-full bg-slate-200 overflow-hidden"><div id="tBar" class="h-full rounded-full bg-emerald-500" style="width:100%"></div></div></div></div>
         ${action}`;
     }
 
@@ -1455,8 +1459,8 @@ async function showTable(code, name) {
   }
 
   function render() {
-    if (!state) { setHTML(root, `<div class="min-h-screen grid place-items-center p-6 text-center"><div><div class="text-5xl mb-3">👋</div><div class="text-slate-700 font-display text-2xl font-semibold">The host closed this session</div><button data-act="leave" class="btn btn-green mt-5">Back to home</button></div></div>`); return; }
-    setHTML(root, `<div class="min-h-screen flex flex-col max-w-xl md:max-w-2xl mx-auto w-full">${header()}<main class="flex-1 flex flex-col gap-4 px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))]">${body()}${state.phase === 'lobby' ? '' : cityStrip() + queueStrip()}</main></div>`);
+    if (!state) { setHTML(root, `<div class="min-h-[100dvh] grid place-items-center p-6 text-center"><div><div class="text-5xl mb-3">👋</div><div class="text-slate-700 font-display text-2xl font-semibold">The host closed this session</div><button data-act="leave" class="btn btn-green mt-5">Back to home</button></div></div>`); return; }
+    setHTML(root, `<div class="min-h-[100dvh] flex flex-col max-w-xl md:max-w-2xl mx-auto w-full">${header()}<main class="flex-1 flex flex-col gap-3 sm:gap-4 px-3 sm:px-4 pb-[max(1rem,env(safe-area-inset-bottom))]">${body()}${state.phase === 'lobby' || state.phase === 'voting' ? '' : cityStrip() + queueStrip()}</main></div>`);
     tick();
   }
   function tick() {
@@ -1465,12 +1469,12 @@ async function showTable(code, name) {
       const left = Math.max(0, state.endsAt - transport.now()), sec = Math.ceil(left / 1000);
       const t = $('#tTime'); if (t) { t.textContent = sec; t.style.color = sec <= 10 ? '#b02229' : ''; }
       const b = $('#tBar'); if (b) { b.style.width = (left / (state.durationMs || 1) * 100) + '%'; b.className = 'h-full rounded-full ' + (sec <= 10 ? 'bg-rose-500' : 'bg-emerald-500'); }
-      const over = left <= 0; if (over !== wasOver) { wasOver = over; render(); }
+      const over = state.endsAt - transport.now() <= -VOTE_LATE_MS; if (over !== wasOver) { wasOver = over; render(); }
     } else wasOver = false;
     const on = hostOnline(); if (on !== lastHostOn) { lastHostOn = on; render(); }
   }
   async function cast(choice) {
-    if (!state || state.phase !== 'voting' || myVote() || transport.now() >= state.endsAt) return;
+    if (!state || state.phase !== 'voting' || myVote() || transport.now() >= state.endsAt + VOTE_LATE_MS) return;
     const vid = state.voteId;
     store.set(lockKey(vid), choice);
     if (navigator.vibrate) navigator.vibrate(60);
@@ -1481,8 +1485,8 @@ async function showTable(code, name) {
   }
 
   teardown.push(transport.on('state', v => { state = normalizeState(v); syncMine(); render(); }));
-  teardown.push(transport.on('hostSeen', v => { hostSeen = v || 0; const on = hostOnline(); if (on !== lastHostOn) { lastHostOn = on; render(); } }));
-  transport.onConnection(c => { connected = c; if (c) reg(); render(); });
+  teardown.push(transport.on('hostSeen', v => { hostSeen = v || 0; hostSeenLoaded = true; const on = hostOnline(); if (on !== lastHostOn) { lastHostOn = on; render(); } }));
+  transport.onConnection(c => { connected = c; if (c) { graceUntil = Date.now() + 10000; reg(); } render(); });
   const loop = setInterval(tick, 250); teardown.push(() => clearInterval(loop));
 
   const onClick = e => {
